@@ -3,6 +3,9 @@
 - 〔2.0.0〕模型權重檢查（規格 §9.5）：版本目錄內有 `pytorch_model.bin`、`*.npz` 就 exit 2、不產生檔案。
 - 〔2.0.2〕`--product basic`（基本版）：產品表的常數、版號檢查用基本版的 SKILL 版本註解、預設版本目錄、
   在暫存的 git repo 實際打包（發行檔名、zip 根目錄、執行權限、README.txt），Pro 預設不變。
+- 〔2.1.0〕H-13（規格 2.1.0 §9.1）：`render_html.FALLBACK_VERSION`＝`common.VERSION`、skill 內 `scripts/` 兩檔與 runtime
+  逐位元相同，不符合 exit 2（不動 dist/）；沒有網頁版的版本目錄與基本版不查；`--sync-skill` 複製兩檔並重產 payload zip；
+  真的 2.1.0 版本目錄通過檢查。
 
 只在暫存目錄建假的版本目錄，不寫 dist/、不呼叫 git 以外的任何外部程式、不呼叫模型。
 """
@@ -228,6 +231,129 @@ class BuildInTempRepo(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("請先重新產生 payload zip", err.getvalue())
         self.assertFalse(self.out.exists())
+
+
+# ---------------------------------------------------------------- 〔2.1.0〕H-13：網頁版檔案
+
+def add_html_files(vd: Path, version: str = "9.9.9", fallback: str | None = None, sync: bool = True) -> None:
+    """runtime 加 render_html.py（FALLBACK_VERSION）、html_template.html；sync：同時複製到 skill/scripts/ 並重產 payload zip。"""
+    rt = vd / "payload" / "runtime" / "scripts"
+    rt.mkdir(parents=True, exist_ok=True)
+    (rt / "render_html.py").write_text(f'"""fake"""\nFALLBACK_VERSION = "{fallback or version}"\n', encoding="utf-8")
+    (rt / "html_template.html").write_text("<!doctype html>\n<html>{{BODY}}</html>\n", encoding="utf-8")
+    if sync:
+        make_dist.sync_skill(vd)
+
+
+class SkillScriptsCheck(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.vd = make_product_dir(self.root, make_dist.PRO, "9.9.9")
+        self.scripts = self.vd / make_dist.PRO.skill_dir / "scripts"
+        self.dist_before = sorted(p.name for p in make_dist.DIST_DIR.iterdir()) if make_dist.DIST_DIR.is_dir() else None
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        dist_after = sorted(p.name for p in make_dist.DIST_DIR.iterdir()) if make_dist.DIST_DIR.is_dir() else None
+        self.assertEqual(dist_after, self.dist_before)          # 不動真的 dist/
+
+    def check_fails(self, *frags):
+        with self.assertRaises(make_dist.DistError) as cm:
+            make_dist.check_skill_scripts(self.vd)
+        msg = str(cm.exception)
+        self.assertIn("H-13", msg)
+        for f in frags:
+            self.assertIn(f, msg)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = make_dist.main([str(self.vd), "--out-dir", str(self.root / "out")])
+        self.assertEqual(code, 2)
+        self.assertIn("H-13", err.getvalue())
+        self.assertFalse((self.root / "out").exists())
+
+    def test_without_html_not_checked(self):
+        self.assertFalse(make_dist.has_html(self.vd))
+        self.assertEqual(make_dist.check_skill_scripts(self.vd), [])
+        with self.assertRaises(make_dist.DistError):
+            make_dist.sync_skill(self.vd)                      # 沒有網頁版：--sync-skill 報錯
+
+    def test_synced_passes_and_zip_has_scripts(self):
+        add_html_files(self.vd)
+        self.assertEqual(make_dist.check_skill_scripts(self.vd), ["render_html.py", "html_template.html"])
+        for n in make_dist.SKILL_SCRIPT_FILES:
+            self.assertEqual((self.scripts / n).read_bytes(), (self.vd / "payload/runtime/scripts" / n).read_bytes())
+        names = make_dist.check_upload_zip(self.vd / make_dist.PRO.payload_zip, self.vd / make_dist.PRO.skill_dir)
+        self.assertIn("meeting-minutes-pro/scripts/render_html.py", names)
+        self.assertIn("meeting-minutes-pro/scripts/html_template.html", names)
+        self.assertIn("meeting-minutes-pro/SKILL.md", names)
+
+    def test_fallback_version_mismatch(self):
+        add_html_files(self.vd, fallback="9.9.8", sync=False)
+        with self.assertRaises(make_dist.DistError):            # --sync-skill 複製後也檢查，版號不一致照樣報錯
+            make_dist.sync_skill(self.vd)
+        self.check_fails("FALLBACK_VERSION 9.9.8 ≠ common.py VERSION 9.9.9")
+
+    def test_fallback_version_missing(self):
+        add_html_files(self.vd)
+        p = self.vd / "payload/runtime/scripts/render_html.py"
+        p.write_text('"""fake"""\n', encoding="utf-8")
+        for n in make_dist.SKILL_SCRIPT_FILES:                  # skill 內也同步，只剩 FALLBACK_VERSION 的問題
+            (self.scripts / n).write_bytes((self.vd / "payload/runtime/scripts" / n).read_bytes())
+        self.check_fails("沒有 FALLBACK_VERSION")
+
+    def test_skill_copy_differs(self):
+        add_html_files(self.vd)
+        (self.scripts / "html_template.html").write_text("<!doctype html>\n<html>{{BODY}}</html>\r\n", encoding="utf-8")
+        self.check_fails("scripts/html_template.html 和 runtime 的不是逐位元相同", "--sync-skill")
+
+    def test_skill_copy_missing(self):
+        add_html_files(self.vd, sync=False)
+        self.check_fails("skill 內沒有 scripts/render_html.py", "skill 內沒有 scripts/html_template.html")
+
+    def test_basic_not_checked(self):
+        vd = make_product_dir(self.root, make_dist.BASIC, "1.0.1")
+        add_html_files(vd, "1.0.1", sync=False)
+        self.assertFalse(make_dist.has_html(vd, make_dist.BASIC))
+        self.assertEqual(make_dist.check_skill_scripts(vd, make_dist.BASIC), [])
+
+    def test_sync_skill_cli(self):
+        add_html_files(self.vd, sync=False)
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()):
+            code = make_dist.main([str(self.vd), "--sync-skill"])
+        self.assertEqual(code, 0)
+        self.assertIn("已重產", out.getvalue())
+        self.assertEqual(make_dist.check_skill_scripts(self.vd), list(make_dist.SKILL_SCRIPT_FILES))
+        make_dist.check_upload_zip(self.vd / make_dist.PRO.payload_zip, self.vd / make_dist.PRO.skill_dir)
+
+    def test_build_with_html_in_temp_repo(self):
+        repo = self.root / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        vd = make_product_dir(repo, make_dist.PRO, "9.9.9")
+        add_html_files(vd)
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        out_dir = self.root / "out2"
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            code = make_dist.main([str(vd), "--out-dir", str(out_dir)])
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertIn("網頁版（H-13）", out.getvalue())
+        with zipfile.ZipFile(out_dir / "meeting-minutes-pro-v9.9.9-claude-app-upload.zip") as zf:
+            self.assertIn("meeting-minutes-pro/scripts/render_html.py", zf.namelist())
+        with zipfile.ZipFile(out_dir / "meeting-minutes-pro-v9.9.9-installer.zip") as zf:
+            names = zf.namelist()
+        for rel in ("payload/runtime/scripts/render_html.py", "payload/skill/meeting-minutes-pro/scripts/html_template.html"):
+            self.assertIn(f"meeting-minutes-pro-v9.9.9/{rel}", names)
+
+
+@unittest.skipUnless(make_dist.has_html(_testenv.VERSION_DIR), "測試的版本目錄沒有網頁版（2.0.x 以前）")
+class RealHtmlVersionDir(unittest.TestCase):
+    def test_h13_real_version_dir(self):
+        vd = _testenv.VERSION_DIR
+        self.assertEqual(make_dist.read_version(vd), _testenv.VERSION)
+        self.assertEqual(make_dist.check_skill_scripts(vd), list(make_dist.SKILL_SCRIPT_FILES))
+        names = make_dist.check_upload_zip(vd / make_dist.PRO.payload_zip, vd / make_dist.PRO.skill_dir)
+        self.assertIn("meeting-minutes-pro/scripts/render_html.py", names)
 
 
 @unittest.skipUnless(make_dist.BASIC.root().is_dir(), "沒有基本版目錄")

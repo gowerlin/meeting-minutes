@@ -343,5 +343,77 @@ class SummaryV2(Base):
         self.assertNotIn("content_type", ev)
 
 
+@unittest.skipUnless(_testenv.VER >= (2, 1, 0), "2.1.0 才有")
+class HtmlLog(Base):
+    """〔2.1.0〕H-10（規格 2.1.0 §6.4）：網頁版的 checkpoint 欄位齊全；run_log／runs.jsonl 不含 .md 內容的 6 字片段、
+    標題與媒體檔名（媒體只記副檔名）；階段名 html 顯示「網頁版」、summary 不加欄位。"""
+
+    MEDIA = "研發部週會錄影第三次.mp4"
+    LINES = ["示範系統上線準備週會", "這段摘要文字不應該出現在紀錄裡面", "負責整理壓測報表與權限文件"]
+    FIELDS = ("status", "reason", "source", "output", "bytes", "headings", "timecodes", "timecodes_out_of_range", "media",
+              "media_ext", "escaped_html", "duration_ms")
+
+    def prepare(self):
+        d = self.out / "研發部週會錄影第三次_minutes"
+        d.mkdir()
+        md = (f"# {self.LINES[0]} 會議記錄\n\n> 自動整理：測試｜**未經人工確認**\n\n## 一、會議摘要\n\n{self.LINES[1]}。`[00:01:00]`\n\n"
+              f"## 四、待辦事項（Action Items）\n\n| # | 事項 | 負責人 | 期限 | 備註 | 時間碼 |\n|---|---|---|---|---|---|\n"
+              f"| A1 | {self.LINES[2]} | S1 | 未定 | — | 00:02:00 |\n")
+        (d / "meeting-minutes.md").write_text(md, encoding="utf-8")
+        (d / "transcript.json").write_text(json.dumps({"meta": {"source": self.MEDIA, "duration": 600.0}}, ensure_ascii=False),
+                                           encoding="utf-8")
+        (self.out / self.MEDIA).write_bytes(b"x")
+        return d
+
+    def blob(self, d):
+        b = (d / runlog.LOG_NAME).read_text(encoding="utf-8")
+        p = self.home / "logs" / runlog.RUNS_NAME
+        return b + (p.read_text(encoding="utf-8") if p.exists() else "")
+
+    def no_content(self, blob):
+        for t in self.LINES:
+            for i in range(0, len(t) - 6):
+                self.assertNotIn(t[i:i + 6], blob, "log 含 .md 內容片段")
+        self.assertNotIn("研發部週會錄影", blob.replace("研發部週會錄影第三次_minutes", ""))   # out_dir 以外不記媒體檔名
+        self.assertNotIn(self.MEDIA, blob)
+
+    def test_standalone_cli(self):
+        d = self.prepare()
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
+        p = subprocess.run([sys.executable, "-B", str(_testenv.SCRIPTS / "render_html.py"), str(d)], capture_output=True,
+                           env=env, timeout=60)
+        self.assertEqual(p.returncode, 0, p.stderr.decode("utf-8", "replace"))
+        ev = runlog.read_events(d / runlog.LOG_NAME)
+        cp = [e for e in ev if e["event"] == "checkpoint" and e["name"] == "html"][0]
+        for k in self.FIELDS:
+            self.assertIn(k, {**cp, "reason": cp.get("reason")}, k)                 # reason 為 None 時事件省略該鍵
+        self.assertEqual((cp["media"], cp["media_ext"], cp["source"], cp["output"]), ("found", ".mp4", "meeting-minutes.md",
+                                                                                     "meeting-minutes.html"))
+        self.assertTrue(ISO_TZ.match(cp["started_at"]))
+        runs = self.runs()
+        self.assertEqual(runs[-1]["stages"].keys(), {"html"})
+        self.assertEqual(runs[-1]["results"]["html"]["status"], "ok")
+        self.no_content(self.blob(d))
+        rows = runlog.summary_rows(runs)
+        self.assertEqual(list(rows[-1]), list(runlog.summary_rows([{"stages": {}}])[0]))   # 不加欄位
+        self.assertEqual(rows[-1]["轉寫"], "—")                                         # 網頁版不算轉寫
+        self.assertEqual(runlog.STAGE_NAME["html"], "網頁版")
+        self.assertEqual(runlog.STAGE_ORDER[-1], "html")
+
+    def test_checkpoint_via_render(self):
+        import render_html
+        d = self.prepare()
+        rl = runlog.RunLog(d, step="minutes")
+        r = render_html.render(d, cfg={}, run_log=rl)
+        self.assertEqual(r["status"], "ok")
+        cp = [e for e in runlog.read_events(d / runlog.LOG_NAME) if e["event"] == "checkpoint"][0]
+        self.assertEqual((cp["name"], cp["step"]), ("minutes.html", "minutes"))
+        self.assertEqual({k for k in self.FIELDS if k in cp} | {"reason"}, set(self.FIELDS))
+        self.no_content(self.blob(d))
+        r = render_html.render(d, md_name="missing.md", cfg={}, run_log=rl)
+        cp = [e for e in runlog.read_events(d / runlog.LOG_NAME) if e["event"] == "checkpoint"][-1]
+        self.assertEqual((cp["status"], cp["reason"]), ("skipped", "no_md"))
+
+
 if __name__ == "__main__":
     unittest.main()

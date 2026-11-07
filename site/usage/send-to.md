@@ -85,6 +85,7 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 | `transcript.corrected.srt` | 校正版字幕（有做 AI 校正時） |
 | `corrections.suggested.tsv` | 建議加進對照表的項目，**還沒生效**，確認後才加入 |
 | `meeting-minutes.md` | 會議記錄（會議類型、有做會議摘要時），表頭寫「未經人工確認」 |
+| `meeting-minutes.html`、`notes.html` | 會議記錄或筆記的[網頁版](/features/web)（2.1），用瀏覽器打開；找得到原始錄音時時間碼可點播放 |
 | `notes.md`、`notes.json` | 課程、訪談等類型的筆記與它的結構化資料 |
 | `frames/frame_0003_001523.jpg` | 影片截圖，檔名裡的 `001523` 代表 00:15:23 |
 | `auto_correct.json`、`auto_minutes.json` | AI 校正與會議摘要的執行紀錄（不含逐字稿內容與金鑰） |
@@ -94,5 +95,5 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 
 ## 下一步
 
-- 有 `meeting-minutes.md`：打開確認決議與待辦。要補講者姓名或修改，把它和 `transcript.corrected.md` 附到 Claude，說「**用 meeting-minutes-pro 檢查這份會議記錄**」（見 [Claude 桌面 App](/usage/claude-app)）。
+- 有 `meeting-minutes.md`：打開 `meeting-minutes.html`（用瀏覽器），確認決議與待辦，點時間碼可以回聽。要補講者姓名或修改，把它和 `transcript.corrected.md` 附到 Claude，說「**用 meeting-minutes-pro 檢查這份會議記錄**」（見 [Claude 桌面 App](/usage/claude-app)）。
 - 有 `corrections.suggested.tsv`：看一下哪些建議是對的，加進[固定錯誤對照表](/features/accuracy#固定錯誤對照表)，下次會更準。

@@ -1,14 +1,14 @@
 # meeting-minutes-pro：本機轉寫的會議記錄 Skill（進階版）
 
-> 版本 2.0.2
+> 版本 2.1.0
 
-把會議錄音或錄影在**自己的電腦上**轉成逐字稿，再讓 Claude 整理成繁體中文會議記錄，內容包括摘要、議題、決議、待辦與待釐清問題，每一項都附時間碼。2.0 起也能整理課程、訪談節目、操作教學、座談、工作坊、需求訪談的錄音（共 7 種內容類型，另可自訂範本），並產生校正版字幕；有 NVIDIA 顯示卡時可以選裝 GPU 說話者分離。轉寫用的硬體在安裝時自動選定：Intel NPU／GPU、NVIDIA GPU、Apple Silicon GPU 或 CPU。
+把會議錄音或錄影在**自己的電腦上**轉成逐字稿，再讓 Claude 整理成繁體中文會議記錄，內容包括摘要、議題、決議、待辦與待釐清問題，每一項都附時間碼。2.0 起也能整理課程、訪談節目、操作教學、座談、工作坊、需求訪談的錄音（共 7 種內容類型，另可自訂範本），並產生校正版字幕；有 NVIDIA 顯示卡時可以選裝 GPU 說話者分離。2.1 起整理完會同時產生**網頁版**（`meeting-minutes.html`／`notes.html`，時間碼點了播放原始錄音）。轉寫用的硬體在安裝時自動選定：Intel NPU／GPU、NVIDIA GPU、Apple Silicon GPU 或 CPU。
 
 - 音檔不上傳。Claude 只會讀到逐字稿和影片截圖。做選用的[自動校正](#6-自動校正選用)或[會議摘要](#7-會議摘要選用120)時，逐字稿文字會送到你選的供應商（Anthropic 或 OpenAI）。
 - 支援 **Windows（x64）** 與 **macOS（Apple Silicon）**。
 - 同一套安裝可以用在 **Claude CLI**（含 Claude 桌面版的 Code 分頁）和 **Claude 桌面 App**（對話／Cowork）。
 
-Pro 版在基本版 `meeting-minutes` 之外，多了十二項功能：
+Pro 版在基本版 `meeting-minutes` 之外，多了十三項功能：
 
 1. **固定錯誤對照表**（`corrections.tsv`）：固定的誤辨識（例如「Kubernetes」總是被辨識成「酷伯內蒂斯」）累積成表，轉寫後自動替換，越用越準。
 2. **校正版逐字稿**（`transcript.corrected.md`）：Claude 標出每一處修改，方便回頭查證。
@@ -22,6 +22,12 @@ Pro 版在基本版 `meeting-minutes` 之外，多了十二項功能：
 10. **自訂範本**（2.0）：在 `templates` 資料夾放自己的範本，延伸內建類型（例「週會（研發處）」）。
 11. **字幕**（2.0）：`transcript.cues.srt`（依字幕規則重新切條）與 `transcript.corrected.srt`（AI 校正後的字幕）。
 12. **說話者分離改進**（2.0）：填人數時保留發言最多的 N 位、發言很少的代號標 ⚠；NVIDIA 顯示卡可選裝 GPU 說話者分離（pyannote）。
+13. **網頁版**（2.1）：會議記錄與筆記另有一份 `.html`，用瀏覽器開：左側目錄、深淺主題、會議摘要卡，時間碼點了播放原始錄音或影片；單一檔、完全離線。
+
+**2.1.0 新功能：網頁版**（詳見[網頁版](#13-網頁版210)）：
+- 整理完（入口的會議摘要、或 `auto_minutes.py`）同時產生 `meeting-minutes.html`（其他類型 `notes.html`），預設開啟，入口**不多問題目**；結束畫面多列一行網頁版，「下一步」改成用瀏覽器打開它。
+- 手改 `.md` 之後用新指令 `render_html.py` 重新產生（不呼叫模型）；`config.json` 新增 `html` 區塊（`enabled`、`media`、`theme`），`auto_minutes.py` 新增 `--no-html`。
+- 既有的輸出檔、設定鍵、旗標與入口題目都不變；從 2.0.x 升級只要重新執行安裝程式（`config.json` 會補上 `html` 區塊）。
 
 **2.0.0 的改進**（從 1.x 升級前請先看[升級注意（1.x → 2.0）](#升級注意1x--20)）：
 - 轉寫前多一題「內容類型」（第一題；直接按 Enter＝會議，之後會記住上次的選擇），講者人數那一題可以輸入 `s` 略過說話者分離（[入口流程](#入口流程120)）。
@@ -493,6 +499,62 @@ labels:
   - 本程式關閉了 pyannote 的使用統計（`PYANNOTE_METRICS_ENABLED=0`），轉寫時不連網、不需要登入。
 - 用了哪個引擎、為什麼：`transcript.json` 的 `meta.diarization`（`engine`、`engine_reason`、`fallback`），`runlog.py summary` 的「分離」欄（`pyannote`／`sherpa`／`略過`，退回 CPU 時 `sherpa*`）。
 
+### 13. 網頁版（2.1.0）
+
+整理完會議記錄或筆記時，同一個輸出資料夾多一份網頁版，用瀏覽器（Chrome、Edge 等）直接打開即可：
+
+| 來源 | 網頁版 |
+|---|---|
+| `meeting-minutes.md`（會議，含 `base: meeting` 的自訂範本） | `meeting-minutes.html` |
+| `notes.md`（其他 6 種類型與它們的自訂範本） | `notes.html` |
+
+- **版面**：左側目錄（螢幕寬度小於 1024px 時收成頂端的「目錄」列）、捲動時標示目前章節、預設深色（頁首的按鈕可改成淺色，瀏覽器會記住）、會議另有決議／待辦／待釐清問題三張摘要卡（點了跳到該節）。頁首照 `.md` 的表頭顯示「自動整理｜未經人工確認」或「自動整理後經對話確認」。列印時不印目錄與播放列，時間碼印成文字。
+- **時間碼可點播放**：找得到瀏覽器能播的原始錄音或影片時，頁面底部（影片在桌機是右下角小窗）放一個播放器，內文的 `HH:MM:SS` 變成按鈕，點了跳到那一秒播放（鍵盤：Tab 到時間碼按 Enter）。找不到或格式不能播時，時間碼是一般文字。
+- **完全離線**：單一個 `.html` 檔，CSS／JS 都在檔案裡、用系統字型，不連任何網站（頁面加了 Content-Security-Policy，連外的請求一律被瀏覽器擋下）。轉換由本機程式完成，**不呼叫任何模型**。
+- 網頁版是 `.md` 的**衍生檔**，內容以 `.md` 為準；不能在網頁上編輯。已有同名 `.html` 時直接覆寫（需要舊的網頁版時，對備份的 `.md` 執行 `render_html.py --file`）。
+- 網頁版內含整份會議記錄內容，轉寄時的注意事項和 `.md` 相同。
+
+**手改 `.md` 之後重新產生**（不呼叫模型；改過 `notes.json` 執行 `auto_minutes.py --render-only` 時會自動接著產生，不必另外執行）：
+
+```bash
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes"                   # 有 meeting-minutes.md 就轉它，否則 notes.md
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes" --file notes.md   # 指定輸出資料夾內的 .md（例備份檔）
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes" --media "<錄音或影片>"   # 指定原始媒體（--no-media＝不放播放器）
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" --md "<檔案>.md" [--out "<檔案>.html"]    # 沒有輸出資料夾的單獨一份 .md（不找媒體）
+```
+
+Windows 把 `venv/bin/python` 換成 `venv\Scripts\python.exe`。`--theme dark｜light` 指定第一次開啟時的主題。exit code：`0` 成功、`2` 跳過（找不到 `.md`、參數錯誤）、`1` 失敗。Claude 在對話中改了會議記錄，也會執行這個指令重新產生。
+
+**原始媒體怎麼找**（依序，第一個瀏覽器能播的就用）：
+
+1. 輸出資料夾的上一層、與原始檔同名（轉寫時預設就是這樣：`週會.m4a` 旁邊的 `週會_minutes/`）。
+2. 輸出資料夾裡、與原始檔同名（把原始檔搬進 `_minutes` 資料夾一起保存）。
+3. 上一層、名稱相同（去掉 `_minutes`）但副檔名不同的可播放檔（例 `.mov` 另存成 `.mp4`）。
+
+- 網頁版寫的是**相對路徑**（例 `../週會.m4a`），不寫你的資料夾或使用者名稱。原始檔和 `_minutes` 資料夾**一起搬**（或把上一層資料夾整個壓縮、複製）時照樣能播；只搬 `_minutes` 資料夾、原始檔改名，或只傳 `.html` 給別人時，開頁時讀不到媒體，播放器自動收起、時間碼變回文字，頁面其他部分正常。在新位置重新執行 `render_html.py`（或加 `--media`）即可恢復。
+- 轉寫時用 `--out-dir` 把輸出資料夾放到別處時，找不到原始檔：用 `--media` 指定。
+- 不會複製或轉檔媒體。
+
+| 副檔名 | 處理 |
+|---|---|
+| `.mp3` `.m4a` `.aac` `.wav` `.flac`、`.mp4` `.m4v` | 放播放器（主流瀏覽器都能播） |
+| `.ogg` `.oga` `.opus` `.weba`、`.webm`、`.mov` | 放播放器；瀏覽器不能播時開頁時自動收起、時間碼變文字 |
+| `.wma` `.wmv` `.avi` `.mkv` `.flv` `.amr` `.3gp` `.aif` `.aiff` `.mpg` `.mpeg` `.ts` `.mts` `.m2ts` `.ape` `.ac3` | 不放播放器；頁首寫明「原始檔格式 .wma 瀏覽器多半不能播放，時間碼以文字顯示」 |
+
+實測只在 Windows 的 Chrome（Edge 抽查）以 `.mp3`、`.wav`、`.mp4` 進行；**macOS（Safari）沒有實機驗證**，靠上面的自動收起兜底（見[附錄](#macos210-網頁版尚未實測safari)）。
+
+**設定**（`config.json` 的 `html`，升級時自動補上）：
+
+| 鍵 | 預設 | 說明 |
+|---|---|---|
+| `html.enabled` | `true` | `auto_minutes.py`（含入口的會議摘要）寫完 `.md` 後產生網頁版；`false`＝不產生。單次不產生：`auto_minutes.py --no-html`。`render_html.py` 不看這個值（你明確要求產生） |
+| `html.media` | `auto` | `auto`＝依上面的順序找原始媒體並放播放器；`off`＝不放播放器（時間碼一律文字） |
+| `html.theme` | `dark` | `dark`／`light`：網頁版第一次開啟時的主題（之後依你在頁面上的選擇） |
+
+不認得的值（例 `"media": "yes"`）當成預設值，並印一行提示。網頁版產生失敗**不影響** `.md` 與整理結果：畫面印一行「網頁版未產生（原因）；可執行 render_html.py 補做」，結果記在 `auto_minutes.json` 的 `html`（`status`、`reason`、`output`、`media`、`timecodes`）與 stdout 的 `minutes.html`。
+
+**Claude App（沙盒）**：上傳用的 skill zip 附了同一支 `render_html.py` 與樣板。Claude 在 App 寫完會議記錄後會問要不要順便產生網頁版，產生後當成檔案交給你；沙盒裡沒有原始錄音，所以時間碼是文字。要點了播放，把 `.md` 放回本機的 `<檔名>_minutes` 資料夾後執行 `render_html.py`。沙盒不能執行 Python 時，Claude 不會手寫 HTML 代替。
+
 ## 升級注意（1.x → 2.0）
 
 重新執行安裝程式就會升級；`glossary.txt`、`corrections.tsv`、`opencc_keep.tsv`、對照表的跨場紀錄、`pricing.json`、`logs/` 都不動，`config.json` 既有的值保留、只補上新鍵（`content_type`、`diarization`、`keyframes`、`content_types`、`subtitles`）。要注意的改變：
@@ -544,8 +606,8 @@ labels:
 
 | 檔案 | 給誰 | 怎麼用 |
 |---|---|---|
-| `meeting-minutes-pro-v1.1.0-installer.zip` | 要在自己電腦上安裝（本機轉寫、右鍵／拖放轉寫、Claude CLI）的人 | 完整解壓縮後執行 `install.cmd`（Windows）或 `install.command`（macOS），步驟見下方 |
-| `meeting-minutes-pro-v1.1.0-claude-app-upload.zip` | 只要在 Claude App 上傳 skill 的人 | **不要解開**，直接上傳（見下方[選單](#選單)後的上傳步驟） |
+| `meeting-minutes-pro-v2.1.0-installer.zip` | 要在自己電腦上安裝（本機轉寫、右鍵／拖放轉寫、Claude CLI）的人 | 完整解壓縮後執行 `install.cmd`（Windows）或 `install.command`（macOS），步驟見下方 |
+| `meeting-minutes-pro-v2.1.0-claude-app-upload.zip` | 只要在 Claude App 上傳 skill 的人 | **不要解開**，直接上傳（見下方[選單](#選單)後的上傳步驟） |
 
 > 把安裝包（`-installer.zip`）直接上傳 Claude App 會出現「Zip cannot contain nested zip files」，請改用 `-claude-app-upload.zip`，或安裝後桌面上的 `meeting-minutes-pro-skill-upload.zip`。
 
@@ -553,7 +615,7 @@ App 的 skill 在沙盒中執行，轉寫仍要在本機完成，所以用 Claud
 
 ### Windows
 
-1. 把 `meeting-minutes-pro-v1.1.0-installer.zip` **完整解壓縮**到任意資料夾（會解出 `meeting-minutes-pro-v1.1.0` 資料夾）。
+1. 把 `meeting-minutes-pro-v2.1.0-installer.zip` **完整解壓縮**到任意資料夾（會解出 `meeting-minutes-pro-v2.1.0` 資料夾）。
 2. 雙擊 **`install.cmd`**。
 3. 在選單中選擇安裝目標（見下方選單）。
 4. 等待安裝完成。第一次安裝約需 5～15 分鐘，大部分時間花在下載模型。
@@ -561,9 +623,9 @@ App 的 skill 在沙盒中執行，轉寫仍要在本機完成，所以用 Claud
 ### macOS
 
 1. 先安裝 [Homebrew](https://brew.sh)（已安裝可略過）。
-2. 在 Finder 解壓縮 `meeting-minutes-pro-v1.1.0-installer.zip`（會解出 `meeting-minutes-pro-v1.1.0` 資料夾）。
+2. 在 Finder 解壓縮 `meeting-minutes-pro-v2.1.0-installer.zip`（會解出 `meeting-minutes-pro-v2.1.0` 資料夾）。
 3. 在 **`install.command`** 上**按右鍵 →「打開」**，再按一次「打開」。第一次執行時，macOS 會擋下從網路下載的腳本，用右鍵開啟才能放行。
-   - 或者在「終端機」執行：`cd ~/Downloads/meeting-minutes-pro-v1.1.0 && ./install.command`
+   - 或者在「終端機」執行：`cd ~/Downloads/meeting-minutes-pro-v2.1.0 && ./install.command`
 4. 在選單中選擇安裝目標，等待安裝完成。
 
 ### 選單
@@ -592,8 +654,8 @@ App 的 skill 在沙盒中執行，轉寫仍要在本機完成，所以用 Claud
 
 選了 App 的話，安裝程式會把 `meeting-minutes-pro-skill-upload.zip` 放到桌面。請到 Claude App 依序點選「**自訂 (Customize)** →『**Skills**』→『**+**』→『**Create skill**』→『**Upload a skill**』」上傳這個 zip（不要解開）。
 
-- 桌面的 `meeting-minutes-pro-skill-upload.zip` 和發行檔 `meeting-minutes-pro-v1.1.0-claude-app-upload.zip` 內容相同，上傳哪一個都可以。
-- 不要上傳安裝包 `meeting-minutes-pro-v1.1.0-installer.zip`：它裡面含有 zip，Claude App 會擋下並顯示「Zip cannot contain nested zip files」。
+- 桌面的 `meeting-minutes-pro-skill-upload.zip` 和發行檔 `meeting-minutes-pro-v2.1.0-claude-app-upload.zip` 內容相同，上傳哪一個都可以。
+- 不要上傳安裝包 `meeting-minutes-pro-v2.1.0-installer.zip`：它裡面含有 zip，Claude App 會擋下並顯示「Zip cannot contain nested zip files」。
 
 - 需要先在「設定 → Capabilities」開啟程式碼執行功能。
 - 網頁版的上傳頁面是 <https://claude.ai/customize/skills>。
@@ -757,7 +819,7 @@ App 的 skill 在沙盒中執行，用不到你電腦的 NPU 或 GPU，所以轉
    - **macOS**：把錄音或錄影檔**拖曳到「應用程式」裡的「會議轉寫（Pro）」**圖示上，或在 Finder 按右鍵 →「打開檔案的應用程式」→「會議轉寫（Pro）」。第一次使用時，macOS 會詢問是否允許它控制「終端機」，請按允許。
 2. 選內容類型（直接按 Enter＝會議，之後會記住上次的選擇）、輸入講者人數和本次的專有名詞（都可以留空；人數輸入 `s` 略過說話者分離）；有安裝 Breeze 時，會再問是否使用 Breeze。接著開始轉寫。
 3. **逐字稿完成後**（1.2.0）依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（直接按 Enter＝是；每題寫明逐字稿會送到 Anthropic 或 OpenAI，並附這次的預估時間與費用），各自再選這次用哪個模型。結束畫面列出產出的檔案與 log 位置，輸出資料夾會自動打開。流程細節見下方〈入口流程（1.2.0）〉。
-4. 有 `meeting-minutes.md`（選了會議摘要）時，先打開確認決議與待辦；要補講者姓名或修改，在 Claude App 附上 `meeting-minutes.md` 與 `transcript.corrected.md`（沒有就附 `transcript.md`），說「**用 meeting-minutes-pro 檢查這份會議記錄**」。沒有選會議摘要時，附上 `transcript.md`（有自動校正時附 `transcript.corrected.md`；影片可以一併附上 `frames` 裡的截圖），說「**用 meeting-minutes-pro 整理成會議記錄，並產生校正版逐字稿**」。Claude 建議加入對照表的項目會以 TSV 給你，請貼到 `corrections.tsv`。找不到 `claude`／`codex` 指令時，兩題都不問，結束訊息會寫怎麼安裝、登入，以及照 1.0.0 的方式附 `transcript.md` 即可。
+4. 有 `meeting-minutes.md`（選了會議摘要）時，先打開確認決議與待辦（2.1 起可以用瀏覽器打開 `meeting-minutes.html`，時間碼點了直接回聽）；要補講者姓名或修改，在 Claude App 附上 `meeting-minutes.md` 與 `transcript.corrected.md`（沒有就附 `transcript.md`），說「**用 meeting-minutes-pro 檢查這份會議記錄**」。沒有選會議摘要時，附上 `transcript.md`（有自動校正時附 `transcript.corrected.md`；影片可以一併附上 `frames` 裡的截圖），說「**用 meeting-minutes-pro 整理成會議記錄，並產生校正版逐字稿**」。Claude 建議加入對照表的項目會以 TSV 給你，請貼到 `corrections.tsv`。找不到 `claude`／`codex` 指令時，兩題都不問，結束訊息會寫怎麼安裝、登入，以及照 1.0.0 的方式附 `transcript.md` 即可。
 
 ```mermaid
 sequenceDiagram
@@ -783,7 +845,7 @@ sequenceDiagram
    - ① `AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）：約 9 分鐘、API 等價約 US$0.46～0.60；逐字稿文字會送到 OpenAI` → 「要做 AI 校正嗎？[Y/n]」→ 選模型
    - ② `會議摘要：OpenAI gpt-6.1-sol（依校正版逐字稿整理）：約 8～10 分鐘、API 等價約 US$0.29～0.44；逐字稿文字會送到 OpenAI` → 「要產生會議摘要嗎？[Y/n]」→ 選模型
    - 錄音超過 2 小時時，兩題前面的說明改成黃色的 `⚠ 錄音長 3 小時 47 分：AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）：約 25～26 分鐘、API 等價約 US$1.32～1.70，會用掉較多額度；逐字稿文字會送到 OpenAI`（取代 1.1.0 在轉寫前的長會議確認）。
-4. 結束畫面列出產出的檔案（`meeting-minutes.md`、`notes.md`、`transcript.corrected.md`、`corrections.suggested.tsv`、`transcript.md`、字幕與條數 …）、`run_log.jsonl` 與 `runs.jsonl` 的位置，以及下一步；說話者分離改用 CPU 時多一行黃字原因，有發言很少的講者時多一行提醒（2.0）。
+4. 結束畫面列出產出的檔案（`meeting-minutes.md`、〔2.1〕`meeting-minutes.html`、`notes.md`、`transcript.corrected.md`、`corrections.suggested.tsv`、`transcript.md`、字幕與條數 …）、`run_log.jsonl` 與 `runs.jsonl` 的位置，以及下一步；說話者分離改用 CPU 時多一行黃字原因，有發言很少的講者時多一行提醒（2.0）。〔2.1〕網頁版那一列的括號寫「時間碼可點播放」（找到能播的原始檔）或「時間碼為文字」；有網頁版時「下一步」改成用瀏覽器打開 `meeting-minutes.html`（`notes.html`）；網頁版沒產生時多一行黃字原因與補做的指令。網頁版不會自動用瀏覽器開啟。
 
 〔2.0〕轉寫前的題目長這樣：
 
@@ -823,7 +885,8 @@ sequenceDiagram
 | `corrections.suggested.tsv` | 自動校正產生的對照表建議，**尚未生效**，確認後才加入 `corrections.tsv` |
 | `auto_correct.json` | 自動校正的執行紀錄（供應商、模型、各段結果、用量估計），不含逐字稿內容、金鑰或帳號資訊 |
 | `meeting-minutes.md` | 會議記錄：入口選了會議摘要（或執行 `auto_minutes.py`）時由 runtime 產出，表頭寫「自動整理：…｜未經人工確認」；CLI 模式下也可能是 Claude 在對話中寫的 |
-| `auto_minutes.json` | 會議摘要的執行紀錄（供應商、模型、每段結果、用量），不含逐字稿內容 |
+| `meeting-minutes.html`／`notes.html` | 〔2.1〕會議記錄／筆記的網頁版（用瀏覽器開；時間碼點了播放原始錄音），由 `.md` 轉出、內容以 `.md` 為準。見[網頁版](#13-網頁版210) |
+| `auto_minutes.json` | 會議摘要的執行紀錄（供應商、模型、每段結果、用量；2.1 起另有網頁版的結果 `html`），不含逐字稿內容 |
 | `run_log.jsonl` | 執行 log（1.2.0）：各步驟的開始／結束時間、每次模型呼叫的 token 與 API 等價費用；不含逐字稿文字與金鑰。見[執行 log](#8-執行-log120) |
 | `notes.md` | 〔2.0〕非會議類型的筆記（課程筆記、訪談筆記…），表頭同樣寫「自動整理：…｜未經人工確認」 |
 | `notes.json` | 〔2.0〕筆記的結構化資料；改過後用 `auto_minutes.py --render-only` 重新產生 `notes.md` |
@@ -856,7 +919,7 @@ flowchart LR
 ```
 
 - **runtime**（共用）：Python venv、模型、轉寫腳本。CLI 和本機轉寫入口共用同一份。開啟自動校正時，runtime 呼叫你電腦上已登入的 `claude` 或 `codex` 指令（或 API），只送逐字稿文字。
-- **skill**：只有 `SKILL.md` 和會議記錄範本，CLI 版和 App 版、Windows 版和 macOS 版內容都相同。Skill 會自己判斷所在環境：找得到 runtime 就在本機轉寫，找不到就改讀使用者附上的逐字稿。
+- **skill**：只有 `SKILL.md`、會議記錄範本與說明（`references/`），以及 2.1 起的網頁版轉換程式（`scripts/render_html.py`、`html_template.html`，和 runtime 的同一份，給 App 沙盒用），CLI 版和 App 版、Windows 版和 macOS 版內容都相同。Skill 會自己判斷所在環境：找得到 runtime 就在本機轉寫，找不到就改讀使用者附上的逐字稿。
 
 ## 檔案位置
 
@@ -866,7 +929,7 @@ flowchart LR
 | Python | `$MMH\venv\Scripts\python.exe` | `$MMH/venv/bin/python` |
 | 模型 | `$MMH\models\` | `$MMH/models/` |
 | 標點模型 | `$MMH\models\sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8\` | `$MMH/models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8/` |
-| 腳本 | `$MMH\scripts\`：`transcribe.py`、`auto_correct.py`、`auto_minutes.py`、`runlog.py`、`punctuate.py`、`opencc_keep.py`、`setup_backend.py`、`backends.py`、`breeze.py`、`corrections.py`、`download_models.py`、`common.py`；2.0 新增 `content_types.py`、`templates.py`、`subtitles.py`、`diarize.py`、`diarize_pyannote.py`、`setup_gpu_diar.py` | 同左 |
+| 腳本 | `$MMH\scripts\`：`transcribe.py`、`auto_correct.py`、`auto_minutes.py`、`runlog.py`、`punctuate.py`、`opencc_keep.py`、`setup_backend.py`、`backends.py`、`breeze.py`、`corrections.py`、`download_models.py`、`common.py`；2.0 新增 `content_types.py`、`templates.py`、`subtitles.py`、`diarize.py`、`diarize_pyannote.py`、`setup_gpu_diar.py`；2.1 新增 `render_html.py`、`html_template.html`（網頁版） | 同左 |
 | **專有名詞清單（可自行編輯）** | `$MMH\glossary.txt` | `$MMH/glossary.txt` |
 | **固定錯誤對照表** | `$MMH\corrections.tsv` | `$MMH/corrections.tsv` |
 | **OpenCC 詞彙回復表（使用者表，可自行編輯）** | `$MMH\opencc_keep.tsv` | `$MMH/opencc_keep.tsv` |
@@ -952,9 +1015,11 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --render-only     # 2.0：改過 notes.json 後重新產生 notes.md
 "$MMH/venv/bin/python" "$MMH/scripts/subtitles.py" "<檔名>_minutes" --corrected          # 2.0：改過 transcript.corrected.md 後重新產生字幕
 "$MMH/venv/bin/python" "$MMH/scripts/templates.py" check                                # 2.0：檢查自訂範本
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes"                     # 2.1：手改 .md 後重新產生網頁版
+"$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --no-html           # 2.1：這次不產生網頁版
 ```
 
-### 1.1.0～2.0.0 的設定鍵（`config.json`）
+### 1.1.0～2.1.0 的設定鍵（`config.json`）
 
 安裝程式只補上不存在的鍵，你改過的值會保留；鍵不存在時一律用預設值。`config.json` 不會存任何金鑰。
 
@@ -997,6 +1062,9 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `subtitles.max_line_chars`／`.max_lines`／`.min_sec`／`.max_sec`／`.max_cps` | `16`／`2`／`0.833`／`7.0`／`9` | 2.0：字幕規則 |
 | `subtitles.speaker_label` | `change` | 2.0：`change`（換人時標）／`always`／`none` |
 | `subtitles.uncertain` | `orig` | 2.0：待確認的字在字幕裡怎麼顯示：`orig` 原文、`guess` 推測、`mark` 原文〔?推測〕 |
+| `html.enabled` | `true` | 2.1：整理完產生網頁版（`meeting-minutes.html`／`notes.html`）；單次關閉用 `auto_minutes.py --no-html` |
+| `html.media` | `auto` | 2.1：`auto`＝找原始媒體並放播放器；`off`＝時間碼一律文字 |
+| `html.theme` | `dark` | 2.1：網頁版第一次開啟時的主題（`dark`／`light`） |
 
 範例：重要會議把 Claude 推理強度提高到 `high`、把分段門檻放寬到 3 秒：
 
@@ -1069,7 +1137,7 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | 候選組合裡沒有 NPU | 確認工作管理員看得到 NPU，更新 Intel NPU 驅動後重新執行 `install.cmd` |
 | 候選組合裡沒有 NVIDIA | 確認 `nvidia-smi` 可執行、驅動支援 CUDA 12，且顯示記憶體至少 3GB |
 | 候選組合裡沒有 MLX（macOS） | 確認是 Apple Silicon Mac，且 Python 是 arm64 原生版（不是 Rosetta）。重新執行 `install.command` |
-| 轉寫時顯示「無法以 … 載入 Whisper」 | 硬體、驅動或系統已變更，重新執行安裝程式重新偵測 |
+| 轉寫時顯示「無法以 … 載入 Whisper …」或「無法以 … 載入 Breeze-ASR-25」 | 硬體、驅動或系統已變更，重新執行安裝程式重新偵測 |
 | 想強制用某個裝置 | Windows：`install.cmd -Backend openvino:CPU`；macOS：`./install.sh --backend ct2:cpu`。指定後端時不測速，`config.json` 既有的 `bench`、`detected_at`（上次偵測的實測）保留；沒有既有值時 `bench` 是空的，Claude 就不會附 turbo 的預估時間 |
 | macOS 顯示「無法打開，因為它來自未識別的開發者」 | 對 `install.command` 按右鍵 →「打開」；或到「系統設定 → 隱私權與安全性」按「強制打開」 |
 | macOS 拖放後沒有反應 | 到「系統設定 → 隱私權與安全性 → 自動化」，允許「會議轉寫（Pro）」控制「終端機」 |
@@ -1086,7 +1154,7 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | 輸出是簡體字 | 確認沒有加 `--no-opencc` |
 | 找不到 ffmpeg | 開新的終端機（Windows 可能需要登出再登入）讓 PATH 生效，然後重新執行安裝程式 |
 | Windows 右鍵沒有「會議轉寫（Pro）」 | Windows 11 要先點「顯示其他選項」，或重新執行 `install.cmd` |
-| App 上傳 skill 失敗 | 確認上傳的是桌面上的 `meeting-minutes-pro-skill-upload.zip` 或發行檔 `meeting-minutes-pro-v1.1.0-claude-app-upload.zip`（不要自行重新壓縮），並確認已開啟程式碼執行功能 |
+| App 上傳 skill 失敗 | 確認上傳的是桌面上的 `meeting-minutes-pro-skill-upload.zip` 或發行檔 `meeting-minutes-pro-v2.1.0-claude-app-upload.zip`（不要自行重新壓縮），並確認已開啟程式碼執行功能 |
 | App 上傳時出現「Zip cannot contain nested zip files」 | 上傳到的是安裝包 `-installer.zip`。改上傳 `-claude-app-upload.zip` 或桌面的 `meeting-minutes-pro-skill-upload.zip` |
 | CLI 出現兩個 meeting-minutes-pro | CLI 以 claude.ai 帳號登入時，App 上傳的 skill 會同步過來。兩者內容相同，可以留一個 |
 | pip 安裝失敗 | 查看 `install.log`。公司網路若有 proxy，先設定 `HTTPS_PROXY` 再重新安裝 |
@@ -1097,6 +1165,10 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | `auth_failed`（Claude） | 在終端機執行 `claude`，輸入 `/login` 用訂閱帳號登入，再用 `auto_correct.py` 補做 |
 | `auth_failed`（OpenAI／Codex） | 在終端機執行 `codex login` 用 ChatGPT 帳號登入；`codex login status` 可以確認（不耗額度） |
 | 入口沒有問「要做 AI 校正嗎？」「要產生會議摘要嗎？」 | 找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`；結束訊息會寫原因與安裝、登入方式。API 通道要先設定 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY` |
+| 〔2.1〕網頁版的時間碼不能點 | 原始檔不在 `<檔名>_minutes` 的上一層（搬走、改名，或轉寫時用了 `--out-dir`），或格式瀏覽器多半不能播（例 `.wma`）：執行 `render_html.py "<檔名>_minutes" --media "<原始檔或可播的檔案>"` |
+| 〔2.1〕網頁版內容和 `.md` 不一樣 | 改過 `.md` 之後沒有重新產生：執行 `render_html.py "<檔名>_minutes"` |
+| 〔2.1〕沒有產生網頁版 | 看 `auto_minutes.json` 的 `html.reason`：`disabled`＝`html.enabled` 是 `false` 或加了 `--no-html`；`template_missing`＝`scripts/html_template.html` 不見了（重新執行安裝程式）；`write_failed`＝輸出資料夾不能寫入；其他用 `render_html.py` 補做 |
+| 〔2.1〕不想要網頁版 | `config.json` 的 `html.enabled` 改成 `false`；只是不要播放器：`html.media` 改成 `off` |
 | 會議摘要沒跑或不完整 | 看輸出資料夾 `auto_minutes.json` 的 `reason` 與 `parts`；`partial` 時 `meeting-minutes.md` 開頭會標出哪一段沒整理。修好後執行 `auto_minutes.py "<檔名>_minutes" --force` 重做 |
 | 想知道每場花了多少時間、費用 | `runlog.py summary`（見[執行 log](#8-執行-log120)）；細節在各輸出資料夾的 `run_log.jsonl` |
 | log 的費用和實際帳單不同 | 訂閱通道（`claude`／`codex` 指令）不另計費，log 的費用是 API 等價估算；價格變了就更新 `$MMH/pricing.json`（見[執行 log](#8-執行-log120)） |
@@ -1189,6 +1261,15 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 3. 確認輸出資料夾有 `notes.md`（選了產生課程筆記時）、`transcript.cues.srt`，`transcript.json` 的 `meta.diarization.engine_reason` 是 `macos`（或略過時 `engine` 是 `none`）。
 4. 再拖一次同一個檔：類型那一題應該寫「Enter＝上次：課程」。
 5. 把輸出資料夾與安裝畫面交回。
+
+### macOS：2.1.0 網頁版尚未實測（Safari）
+
+2.1 的網頁版只在 Windows 的 Chrome（Edge 抽查）實測過；**macOS 的 Safari 沒有實機驗證**。`.ogg`／`.webm`／`.mov` 這類格式在 Safari 能不能播依版本而定，不能播時頁面會自動收起播放器、時間碼變文字（不會顯示壞掉的播放器）。願意協助的話（只用合成或不敏感的錄音）：
+
+1. 升級到 2.1.0 後，把一段 `.m4a` 或 `.mp3` 錄音拖到「會議轉寫（Pro）」，產生會議摘要；結束畫面應該有 `meeting-minutes.html` 那一列。
+2. 在 Finder 對 `meeting-minutes.html` 按右鍵 →「打開檔案的應用程式」→ Safari：確認目錄、深淺主題切換、點 3 個時間碼會跳到該秒播放。
+3. 把原始錄音搬到別的資料夾後重新整理頁面：播放器應該收起、時間碼變成文字。
+4. 把畫面截圖與 Safari 版本交回。
 
 ### 開發者測試（不影響正式安裝）
 

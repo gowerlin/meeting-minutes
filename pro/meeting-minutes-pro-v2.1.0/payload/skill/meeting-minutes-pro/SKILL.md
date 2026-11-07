@@ -1,14 +1,14 @@
 ---
 name: meeting-minutes-pro
-description: 進階版會議記錄 skill。把會議錄音、錄影或逐字稿整理成繁體中文會議記錄（摘要、決議、待辦、待釐清問題，附時間碼），並另外產出標示修改處的校正版逐字稿；支援會議、課程、訪談、操作教學、座談、工作坊、需求訪談 7 種內容類型與自訂範本（非會議類型產出 notes.md 筆記）、校正版字幕（transcript.cues.srt、transcript.corrected.srt）、選用的 GPU 說話者分離（NVIDIA，pyannote）；固定誤辨識會累積到錯誤對照表，下次轉寫時自動替換；中英夾雜很重的技術會議可改用 Breeze-ASR-25；本機自動分段標點；右鍵／拖放轉寫完會詢問要不要做 AI 校正與會議摘要（Claude 或 OpenAI），每次執行都留下執行 log（各步驟耗時、token、API 等價費用）。本機有 runtime 時在本機轉寫（Windows／macOS，硬體在安裝時選定），在 Claude App 沙盒中則讀取使用者附上的 transcript.md 或 transcript.corrected.md。當使用者要分析會議錄音或錄影、產生會議記錄、逐字稿、校正版逐字稿、meeting minutes 或 transcript，或要整理課程、演講、Podcast、訪談、操作教學、座談、工作坊、需求訪談的錄音成筆記或字幕，或提到 meeting-minutes-pro、Breeze、錯誤對照表、自動校正、會議摘要、內容類型、自訂範本、字幕、說話者分離、執行 log 時使用。
+description: 進階版會議記錄 skill。把會議錄音、錄影或逐字稿整理成繁體中文會議記錄（摘要、決議、待辦、待釐清問題，附時間碼），並另外產出標示修改處的校正版逐字稿；支援會議、課程、訪談、操作教學、座談、工作坊、需求訪談 7 種內容類型與自訂範本（非會議類型產出 notes.md 筆記）、校正版字幕（transcript.cues.srt、transcript.corrected.srt）、選用的 GPU 說話者分離（NVIDIA，pyannote）、會議記錄與筆記的網頁版（時間碼可點播放）；固定誤辨識會累積到錯誤對照表，下次轉寫時自動替換；中英夾雜很重的技術會議可改用 Breeze-ASR-25；本機自動分段標點；右鍵／拖放轉寫完會詢問要不要做 AI 校正與會議摘要（Claude 或 OpenAI），每次執行都留下執行 log（各步驟耗時、token、API 等價費用）。本機有 runtime 時在本機轉寫（Windows／macOS，硬體在安裝時選定），在 Claude App 沙盒中則讀取使用者附上的 transcript.md 或 transcript.corrected.md。當使用者要分析會議錄音或錄影、產生會議記錄、逐字稿、校正版逐字稿、meeting minutes 或 transcript，或要整理課程、演講、Podcast、訪談、操作教學、座談、工作坊、需求訪談的錄音成筆記或字幕，或提到 meeting-minutes-pro、Breeze、錯誤對照表、自動校正、會議摘要、內容類型、自訂範本、字幕、說話者分離、執行 log、網頁版時使用。
 ---
-<!-- meeting-minutes-pro-version: 2.0.2 -->
+<!-- meeting-minutes-pro-version: 2.1.0 -->
 
 # 會議記錄（Pro）
 
 音檔不上傳：轉寫在使用者電腦上完成，Claude 只讀逐字稿與截圖。做自動校正或會議摘要時，逐字稿文字（不含音檔與截圖）會送到使用者選的供應商（Anthropic 或 OpenAI）。
 
-Pro 版比基本版多十件事：
+Pro 版比基本版多十一件事：
 
 1. **固定錯誤對照表**（`corrections.tsv`）：轉寫後自動替換固定誤辨識，對照表會越用越完整。
 2. **校正版逐字稿**（`transcript.corrected.md`）：標出每一處修改，方便回頭查證。
@@ -20,6 +20,7 @@ Pro 版比基本版多十件事：
 8. **內容類型與自訂範本**（2.0）：會議、課程、訪談節目、操作教學、座談、工作坊、需求訪談 7 種，各有自己的筆記節與欄位（`references/content-types.md`）；會議產出 `meeting-minutes.md`，其他類型產出 `notes.md`＋`notes.json`。使用者可在 `$MMH/templates/` 放自訂範本延伸內建類型（`references/custom-template-format.md`）。
 9. **字幕**（2.0）：`transcript.cues.srt`（不經 AI，依字幕規則重新切條）與 `transcript.corrected.srt`（校正版對應回時間軸後切條）；`transcript.srt` 照舊一段一條。
 10. **說話者分離**（2.0）：填實際人數時保留發言最多的 N 位；發言很少的代號在表頭標 ⚠；有 NVIDIA 顯示卡可選裝 GPU 說話者分離（pyannote，安裝時詢問）。
+11. **網頁版**（2.1）：整理完同時產生 `meeting-minutes.html`／`notes.html`（左側目錄、深淺主題、時間碼點了播放原始錄音；單一檔、完全離線）。網頁版由程式（`render_html.py`，不呼叫模型）從 `.md` 轉出，內容以 `.md` 為準；**你不手寫 HTML**。
 
 ## 0. 判斷執行模式
 
@@ -58,6 +59,16 @@ macOS 的路徑含空白（`Application Support`），之後的指令一律用�
 如果 Cowork 已連結使用者電腦並可存取該資料夾，可以直接讀取 `<檔名>_minutes/transcript.md`。
 
 **逐字稿模式（Claude App 沙盒）的 2.0 補充**：不能執行 runtime，所以內容類型由你判斷（步驟 1 第一點的推斷＋一句話確認），依 `references/content-types.md` 在對話中寫筆記（會議照 `references/minutes-template.md`）；講者發言時間取逐字稿表頭「講者發言時間」那一行（2.0 轉寫的才有）。使用者附上 `transcript.corrected.md` 時照步驟 3(a)。字幕無法在 App 中產生：告訴使用者在本機執行 `subtitles.py`（步驟 4.3）。使用者附上自訂範本時照步驟 4.4。
+
+**逐字稿模式（Claude App 沙盒）的網頁版（2.1）**：本 skill 附了 `scripts/render_html.py` 與 `scripts/html_template.html`（與本檔同一層的 `scripts/` 資料夾；和本機 runtime 的是同一份，只用 Python 標準函式庫）。
+
+1. 寫完會議記錄或筆記後問一句「要不要順便產生網頁版？」（App 模式要多下載一個檔案，所以問一次；使用者主動要網頁版時不必再問）。
+2. 要的話：把會議記錄存成沙盒裡的 `meeting-minutes.md`（其他類型 `notes.md`），執行
+   `python <本 skill 目錄>/scripts/render_html.py --md meeting-minutes.md --out meeting-minutes.html`（exit 0＝成功；stdout 最後一行 `{"html": {…}}`）。
+3. 把 `meeting-minutes.html` 當成檔案交給使用者，並說明：沙盒裡沒有原始錄音，所以時間碼是文字；要點了播放，請在本機把 `.md` 放回 `<檔名>_minutes` 資料夾後執行 `render_html.py`（步驟 4.2）。
+
+- 沙盒不能執行 Python 時：**不要手寫 HTML 代替**（版面、跳脫、安全設定都可能不一致），告訴使用者在本機執行 `render_html.py`。
+- 不要發布成 Artifact：網頁版是給使用者留在手上的離線檔案。使用者明確要求「做成 Artifact」時，才把同一份 `render_html.py` 產生的 HTML 發布（Artifact 裡沒有媒體，時間碼同樣是文字）。
 
 ## 1. 開始前確認（本機模式；缺什麼才問，一次問完）
 
@@ -99,7 +110,7 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 - 1 小時錄音用 turbo 約需數分鐘到十幾分鐘，Breeze 慢數倍；有自動校正時再加約 7 分鐘（OpenAI gpt-6.1-sol）或 5 分鐘（Claude opus；sonnet 約 3～5 分鐘）。**一律背景執行**，或把 timeout 設到 600000 ms 以上，不要中途重跑。
 - 影片會自動擷取畫面變化存到 `frames/`；加 `--no-keyframes` 可關閉。只有一人講話時加 `--no-diarize`。
 - 分段與標點在轉寫時已在本機完成，寫進 `transcript.md`；`transcript.md` 開頭會列出分段標點來源與 OpenCC 詞彙回復次數。
-- 輸出在 `<檔名>_minutes/`：`transcript.md`、`transcript.json`、`transcript.srt`、`transcript.cues.srt`（2.0 字幕，不經 AI）、`frames/`、`run_log.jsonl`（1.2.0 執行 log）；有自動校正時另有 `transcript.corrected.md`、`transcript.corrected.srt`（2.0 校正版字幕）、`corrections.suggested.tsv`（對照表建議，尚未生效）、`auto_correct.json`（執行紀錄）。
+- 輸出在 `<檔名>_minutes/`：`transcript.md`、`transcript.json`、`transcript.srt`、`transcript.cues.srt`（2.0 字幕，不經 AI）、`frames/`、`run_log.jsonl`（1.2.0 執行 log）；有自動校正時另有 `transcript.corrected.md`、`transcript.corrected.srt`（2.0 校正版字幕）、`corrections.suggested.tsv`（對照表建議，尚未生效）、`auto_correct.json`（執行紀錄）。整理（步驟 2.1，或右鍵／拖放入口的會議摘要）之後另有 `meeting-minutes.md`／`notes.md` 與〔2.1〕網頁版 `meeting-minutes.html`／`notes.html`。
 - **執行 log**（1.2.0）：`transcribe.py` 與 `auto_correct.py`（含 `--correct` 管線）會把各步驟的時間、每次模型呼叫的 token 與費用寫進 `run_log.jsonl`，結束時在 `$MMH/logs/runs.jsonl` 追加一列。你在對話中寫會議記錄、校正的部分**不在 runtime 裡，不會記進 log**；使用者要看耗時或費用時執行 `"$PY" "$MMH/scripts/runlog.py" summary`（`--last 10`、`--csv 檔案`）。
 - stdout 最後一行是 JSON 摘要，含 `model`、`corrections_applied`、`paragraphs`、〔2.0〕`content_type`、`diarize_engine`（`pyannote`／`sherpa`／`none`）、`diarize_fallback`（要用 GPU 卻退回 CPU 的原因，沒有是 `null`）、`subtitles`（字幕條數），以及自動校正結果 `correction`（沒有執行時是 `null`）：
 
@@ -125,6 +136,7 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 - 有 `transcript.corrected.md` 就用它（自動用修正後的寫法，待確認的保留推測），否則用 `transcript.md`；只送文字，不送截圖（操作教學的關鍵畫面由程式依時間掛到步驟，不送圖片）。
 - 長逐字稿（超過約 12,000 字）分段整理再彙整（1.2.1 起每段附相鄰段的前後文，段落交界被切開的討論不會被誤列成待釐清問題；1.2.2 起會中已有答覆（含有條件的答覆）的事、現況說明、會中沒有人提出的問題都不列為待釐清問題）；產出 `meeting-minutes.md`（表頭寫「自動整理：…｜未經人工確認」）與 `auto_minutes.json`。已有 `meeting-minutes.md` 時要加 `--force`（舊檔改名備份），先問使用者。
 - stdout 最後一行 JSON 的 `minutes.status`／`reason` 處理方式同步驟 2 的表（`cli_not_found`、`auth_failed` 等）；失敗時照步驟 4.2 自己寫。
+- 〔2.1〕**網頁版**：`.md` 寫入成功（`ok`／`partial`）後接著產生 `meeting-minutes.html`／`notes.html`（`config.json` 的 `html.enabled`，預設開；本次不要加 `--no-html`）。結果在 stdout 的 `minutes.html`（`status`：`ok`／`failed`／`skipped`、`reason`、`output`、`media`）與 `auto_minutes.json` 的 `html`。`media` 是 `found`／`explicit` 時時間碼可點播放；`none`（找不到原始檔）、`unsupported`（格式瀏覽器多半不能播，例 `.wma`）、`off`（設定關）時時間碼是文字。網頁版失敗（`template_missing`、`write_failed`、`internal_error`）**不影響** `.md`、`minutes.status` 與 exit code：轉告使用者，並用步驟 4.2 的 `render_html.py` 補做。
 - 這也是送出逐字稿文字，只在使用者要求或答應後才執行。
 
 ## 3. 閱讀與校正
@@ -174,6 +186,14 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 - 只寫會議中實際提到的內容；Claude 自己的建議放在獨立的「補充建議」段落。
 - 在「轉寫品質備註」寫明使用的模型（turbo 或 breeze）與後端、分段標點來源（`meta.punctuation`：CT-Transformer 幾段、Whisper 標點幾段），以及是否自動校正（供應商、模型、通道、完成段數，取自 `meta.correction` 或 `auto_correct.json`），資料取自 `transcript.json` 的 meta。
 - 流程圖和時序圖一律用 Mermaid。
+- 〔2.1〕**網頁版要跟著重新產生**：你在對話中寫完或修改 `meeting-minutes.md`／`notes.md`、存到輸出資料夾之後，執行
+
+  ```bash
+  "$PY" "$MMH/scripts/render_html.py" "<檔名>_minutes"                  # 有 meeting-minutes.md 就轉它，否則 notes.md
+  "$PY" "$MMH/scripts/render_html.py" "<檔名>_minutes" --file notes.md  # 指定輸出資料夾內的 .md
+  ```
+
+  不呼叫模型、不送任何資料，不必先問使用者。`auto_minutes.py --render-only` 會自動接著產生，不必再執行。exit 0＝成功、2＝跳過（找不到 `.md`、參數錯誤）、1＝失敗；stdout 最後一行 `{"html": {…}}`。媒體：`--media <檔案>` 指定原始錄音或影片、`--no-media` 不放播放器；`--theme dark｜light` 是第一次開啟時的主題。**不要手寫 HTML**：網頁版只由 `render_html.py` 產生，版面與跳脫規則才一致。
 
 ### 4.3 字幕（2.0）
 
@@ -225,6 +245,7 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 - 補做或重做自動校正：`"$PY" "$MMH/scripts/auto_correct.py" "<檔名>_minutes"`。已有 `transcript.corrected.md` 時要加 `--force`（舊檔會改名備份），對話中補過的標記會被新結果取代，所以先問使用者。
 - 補做或重做會議摘要：`"$PY" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" [--force]`（見步驟 2.1）。
 - 看歷次轉寫的耗時與費用：`"$PY" "$MMH/scripts/runlog.py" summary`（每場耗時、各步驟時間、token、API 等價費用、每小時錄音成本）。
+- 〔2.1〕把網頁版傳給別人：網頁版寫的是原始檔的**相對路徑**，時間碼要能點播放，必須把原始錄音（或影片）和 `<檔名>_minutes` 資料夾**一起**給（例如把上一層資料夾整個壓縮）；只傳 `.html` 時時間碼會是文字（頁面會自動收起播放列）。網頁版內含整份會議記錄內容，轉寄時的注意事項同 `.md`。
 
 ## 疑難排解（本機模式）
 
@@ -245,6 +266,10 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 | `transcript.md` 開頭寫「標點模型未安裝」 | `"$PY" "$MMH/scripts/setup_backend.py" --punct-only` 補裝（約 65 MB） |
 | OpenCC 把詞改錯（例「權限」變「許可權」、「帳號」變「賬號」） | 先試：`"$PY" "$MMH/scripts/opencc_keep.py" test "要測試的句子"`；確認後把詞加到 `$MMH/opencc_keep.tsv`（格式見檔案開頭說明），下次轉寫生效 |
 | 自動校正沒跑 | 看 `<檔名>_minutes/auto_correct.json` 的 `reason`（或 stdout 的 `correction.reason`），處理方式見步驟 2 的表 |
+| 〔2.1〕網頁版的時間碼不能點 | 原始檔不在 `<檔名>_minutes` 的上一層（或改了名、搬走了）、格式瀏覽器多半不能播（例 `.wma`）：`"$PY" "$MMH/scripts/render_html.py" "<檔名>_minutes" --media "<原始檔或可播的檔案>"` |
+| 〔2.1〕網頁版內容和 `.md` 不一樣 | 改過 `.md` 之後沒有重新產生：執行 `render_html.py`（步驟 4.2） |
+| 〔2.1〕網頁版沒產生 | 看 `auto_minutes.json` 的 `html.reason`：`disabled`＝設定關或加了 `--no-html`；`template_missing`＝`scripts/html_template.html` 不見了（重新執行安裝程式）；其他用 `render_html.py` 補做 |
+| 〔2.1〕不要網頁版 | `config.json` 的 `html.enabled` 改成 `false`（單次：`auto_minutes.py --no-html`）；不要播放器：`html.media` 改成 `off` |
 | 會議摘要沒跑或不完整 | 看 `<檔名>_minutes/auto_minutes.json` 的 `reason` 與 `parts`；`partial` 時 `meeting-minutes.md` 開頭會標出哪一段沒整理，可用 `auto_minutes.py --force` 重跑 |
 | 想知道每場花多少時間、費用 | `runlog.py summary`；細節在各輸出資料夾的 `run_log.jsonl`（不含逐字稿文字）。價格表在 `scripts/pricing.json`，要更新可在 `$MMH/pricing.json` 寫同名項目 |
 | `auth_failed`（Claude） | 在終端機執行 `claude`，輸入 `/login` 用訂閱帳號登入 |

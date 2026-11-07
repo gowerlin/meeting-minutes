@@ -49,7 +49,7 @@ features:
   { title: '下載並安裝', text: '下載安裝包、解開，雙擊 install.cmd（Windows）或 install.command（macOS）。第一次約 5～15 分鐘。' },
   { title: '對錄音檔按右鍵', text: 'Windows：右鍵 →「傳送到」→「會議轉寫（Pro）」。macOS：把檔案拖到「會議轉寫（Pro）」。' },
   { title: '回答幾個問題', text: '內容類型、講者人數都可以直接按 Enter。轉寫完再決定要不要做 AI 校正與會議摘要。' },
-  { title: '打開輸出資料夾', text: '錄音檔旁邊會出現「檔名_minutes」資料夾，裡面有逐字稿、會議記錄與字幕。' }
+  { title: '打開輸出資料夾', text: '錄音檔旁邊會出現「檔名_minutes」資料夾，裡面有逐字稿、會議記錄（另有可點時間碼回聽的網頁版）與字幕。' }
 ]" />
 
 ## 你的錄音去了哪裡

@@ -32,11 +32,12 @@ LOG_NAME = "run_log.jsonl"
 RUNS_NAME = "runs.jsonl"
 PRICING = Path(__file__).resolve().parent / "pricing.json"
 # 〔2.0.0〕subtitles（字幕；2.0.0 新增的檢查點）排在 write_outputs 與 correct 之間
+# 〔2.1.0〕html（網頁版；單獨執行 render_html.py 時的階段，排在 minutes 之後。auto_minutes 內是 minutes.html 檢查點，不另成階段）
 STAGE_ORDER = ("convert_audio", "keyframes", "diarize", "asr", "punctuate", "write_outputs", "subtitles", "correct",
-               "minutes")
+               "minutes", "html")
 STAGE_NAME = {"convert_audio": "轉換音訊", "keyframes": "擷取畫面", "diarize": "說話者分離", "asr": "語音辨識",
               "punctuate": "分段標點", "write_outputs": "輸出檔案", "subtitles": "字幕", "correct": "AI 校正",
-              "minutes": "會議摘要"}
+              "minutes": "會議摘要", "html": "網頁版"}
 TOKEN_KEYS = ("input", "cache_read", "cache_write", "output", "reasoning")
 # 〔2.0.0〕info 事件裡要彙整進 runs.jsonl 的欄位（規格 §6.4）
 INFO_KEYS = ("source", "recording_sec", "segments", "paragraphs", "speakers", "asr_model", "device")
@@ -352,7 +353,7 @@ def summary_rows(runs: list) -> list:
     rows = []
     for r in runs:
         st = r.get("stages") or {}
-        transcribe = sum(v for k, v in st.items() if k not in ("correct", "minutes"))
+        transcribe = sum(v for k, v in st.items() if k not in ("correct", "minutes", "html"))   # 〔2.1.0〕網頁版不算轉寫
         tok = r.get("tokens") or {}
         rows.append({
             "日期": (r.get("started_at") or r.get("finished_at") or "")[:16].replace("T", " "),

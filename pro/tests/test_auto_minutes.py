@@ -966,5 +966,172 @@ class Templates(Base):
             ac.subprocess.run = orig_run
 
 
+V21 = _testenv.VER >= (2, 1, 0)
+
+
+@unittest.skipUnless(V21, "2.1.0 才有")
+class Html(Base):
+    """〔2.1.0〕H-8（規格 2.1.0 §2.2、§6.4）：auto_minutes 寫完 .md 後產生網頁版；網頁版的任何結果都不影響 .md、status、
+    reason 與 exit code。假呼叫器，不呼叫模型。"""
+
+    def setUp(self):
+        super().setUp()
+        import render_html
+        self.rh = render_html
+        self._build = render_html.build
+        self._tpl = render_html.TEMPLATE_NAME
+        self._write = render_html.write_atomic
+
+    def tearDown(self):
+        self.rh.build = self._build
+        self.rh.TEMPLATE_NAME = self._tpl
+        self.rh.write_atomic = self._write
+        super().tearDown()
+
+    def rec(self):
+        return json.loads((self.out / "auto_minutes.json").read_text(encoding="utf-8"))
+
+    def main(self, *args):
+        """main()（stdout 最後一行 JSON、exit code）；select_backend 已由 use() 換成假的。"""
+        import contextlib
+        import io
+        import sys
+        out, err = io.StringIO(), io.StringIO()
+        argv = sys.argv
+        sys.argv = ["auto_minutes.py", str(self.out), *args]
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                try:
+                    am.main()
+                    code = 0
+                except SystemExit as ex:
+                    code = ex.code
+        finally:
+            sys.argv = argv
+        return code, json.loads(out.getvalue().strip().splitlines()[-1]), err.getvalue()
+
+    def test_ok(self):
+        self.write()
+        self.use(Fake())
+        res = self.run_am()
+        self.assertEqual(res["status"], "ok")
+        h = res["html"]
+        self.assertEqual((h["status"], h["reason"], h["output"], h["media"]), ("ok", None, "meeting-minutes.html", "none"))
+        self.assertTrue((self.out / "meeting-minutes.html").exists())
+        self.assertEqual(self.rec()["html"], {"status": "ok", "reason": None, "output": "meeting-minutes.html",
+                                              "media": "none", "timecodes": h["timecodes"]})
+        self.assertGreater(h["timecodes"], 3)
+        ev = runlog.read_events(self.out / runlog.LOG_NAME)
+        cp = [e for e in ev if e["event"] == "checkpoint" and e["name"] == "minutes.html"]
+        self.assertEqual((len(cp), cp[0]["step"], cp[0]["status"], cp[0]["output"]), (1, "minutes", "ok", "meeting-minutes.html"))
+        names = [e.get("name") for e in ev if e["event"] == "checkpoint"]
+        self.assertLess(names.index("minutes.html"), names.index("minutes"))   # 在 minutes 步驟內
+        self.assertNotIn("html", ev[-1]["stages"])                                 # summary 不加階段
+
+    def test_partial_still_renders(self):
+        self.write(6)
+        self.use(Fake([result("1"), ac._fail("cli_error"), ac._fail("cli_error"), result("3"), result("合併")]))
+        res = self.run_am(cfg={"minutes": {"chunk_chars": 50}})
+        self.assertEqual((res["status"], res["html"]["status"]), ("partial", "ok"))
+        page = (self.out / "meeting-minutes.html").read_text(encoding="utf-8")
+        self.assertRegex(page, r'<p class="callout">⚠ \d\d:\d\d:\d\d～\d\d:\d\d:\d\d 這段未能自動整理（原因：cli_error）')   # 頁首提醒框
+
+    def test_no_html_and_disabled(self):
+        self.write()
+        self.use(Fake([result(), result()]))
+        res = self.run_am(html=False)
+        self.assertEqual((res["status"], res["html"]["status"], res["html"]["reason"]), ("ok", "skipped", "disabled"))
+        self.assertFalse((self.out / "meeting-minutes.html").exists())
+        self.assertEqual(self.rec()["html"]["reason"], "disabled")
+        res = self.run_am(cfg={"html": {"enabled": False}}, force=True)
+        self.assertEqual((res["html"]["status"], res["html"]["reason"]), ("skipped", "disabled"))
+        self.assertFalse((self.out / "meeting-minutes.html").exists())
+
+    def test_skipped_minutes_no_html(self):
+        self.write()
+        self.use(Fake())
+        self.run_am()
+        (self.out / "meeting-minutes.html").unlink()
+        res = self.run_am()                                                        # 已有 .md → skipped exists
+        self.assertEqual((res["status"], res["html"]["status"], res["html"]["reason"]), ("skipped", "skipped", "no_md"))
+        self.assertFalse((self.out / "meeting-minutes.html").exists())
+
+    def test_failures_do_not_change_status(self):
+        self.write()
+        cases = []
+
+        def boom(*a, **k):
+            raise RuntimeError("網頁版內部錯誤的訊息不應該出現")
+
+        def ro(*a, **k):
+            raise PermissionError("唯讀")
+        for name, patch, reason in (("raise", lambda: setattr(self.rh, "build", boom), "internal_error"),
+                                    ("template", lambda: setattr(self.rh, "TEMPLATE_NAME", "missing.html"), "template_missing"),
+                                    ("readonly", lambda: setattr(self.rh, "write_atomic", ro), "write_failed")):
+            with self.subTest(case=name):
+                self.tearDown_patch()
+                patch()
+                self.use(Fake([result()]))
+                code, out, err = self.main("--force")
+                cases.append(name)
+                self.assertEqual(code, 0)
+                m = out["minutes"]
+                self.assertEqual((m["status"], m["reason"]), ("ok", None))
+                self.assertEqual(m["html"], {"status": "failed", "reason": reason, "output": m["html"]["output"], "media": None})
+                self.assertTrue((self.out / "meeting-minutes.md").exists())
+                self.assertIn(f"[!] 網頁版未產生（{reason}）；meeting-minutes.md 不受影響，可執行 render_html.py 補做", err)
+                self.assertEqual(self.rec()["status"], "ok")
+                self.assertEqual(self.rec()["html"]["reason"], reason)
+                log = (self.out / runlog.LOG_NAME).read_text(encoding="utf-8")
+                self.assertNotIn("網頁版內部錯誤的訊息", log)
+                self.assertNotIn("網頁版內部錯誤的訊息", json.dumps(self.rec(), ensure_ascii=False))
+        self.assertEqual(len(cases), 3)
+
+    def tearDown_patch(self):
+        self.rh.build = self._build
+        self.rh.TEMPLATE_NAME = self._tpl
+        self.rh.write_atomic = self._write
+
+    def test_cli_stdout_and_no_html_flag(self):
+        self.write()
+        self.use(Fake([result(), result()]))
+        code, out, err = self.main()
+        self.assertEqual(code, 0)
+        self.assertEqual(out["minutes"]["html"], {"status": "ok", "reason": None, "output": "meeting-minutes.html", "media": "none"})
+        self.assertIn("網頁版：meeting-minutes.html（時間碼為文字）", err)
+        (self.out / "meeting-minutes.html").unlink()
+        code, out, _ = self.main("--force", "--no-html")
+        self.assertEqual((code, out["minutes"]["html"]["reason"]), (0, "disabled"))
+        self.assertFalse((self.out / "meeting-minutes.html").exists())
+
+    def test_render_only(self):
+        self.write(3)
+        self.use(Fake([notes_result("course")]))
+        self.run_am(content_type="course")
+        self.assertTrue((self.out / "notes.html").exists())
+        (self.out / "notes.html").unlink()
+        r = am.render_only(self.out, cfg={})
+        self.assertEqual((r["status"], r["html"]["status"], r["html"]["output"]), ("ok", "ok", "notes.html"))
+        self.assertTrue((self.out / "notes.html").exists())
+        (self.out / "notes.html").unlink()
+        r = am.render_only(self.out, cfg={}, html=False)
+        self.assertEqual(r["html"]["reason"], "disabled")
+        self.assertFalse((self.out / "notes.html").exists())
+        code, out, _ = self.main("--render-only", "--type", "course", "--no-html")
+        self.assertEqual((code, out["minutes"]["html"]["reason"]), (0, "disabled"))
+        code, out, _ = self.main("--render-only", "--type", "course")
+        self.assertEqual((code, out["minutes"]["html"]["status"]), (0, "ok"))
+
+    def test_md_unchanged_by_html(self):
+        """.md 與 --no-html 時逐位元相同（網頁版只新增檔案）。"""
+        self.write()
+        self.use(Fake([result(), result()]))
+        self.run_am(html=False)
+        a = (self.out / "meeting-minutes.md").read_bytes()
+        self.run_am(force=True)
+        b = (self.out / "meeting-minutes.md").read_bytes()
+        self.assertEqual(re.sub(rb"\d{4}-\d\d-\d\d", b"D", a), re.sub(rb"\d{4}-\d\d-\d\d", b"D", b))
+
+
 if __name__ == "__main__":
     unittest.main()

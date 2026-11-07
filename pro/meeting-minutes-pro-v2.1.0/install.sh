@@ -1,5 +1,5 @@
 #!/bin/bash
-# meeting-minutes-pro 2.0.2 一鍵安裝程式（macOS Apple Silicon）
+# meeting-minutes-pro 2.1.0 一鍵安裝程式（macOS Apple Silicon）
 #   - 共用 runtime：~/Library/Application Support/meeting-minutes-pro（venv、模型、腳本、glossary、config）
 #     設定環境變數 MEETING_MINUTES_PRO_HOME 可改放到其他位置
 #   - 目標 CLI ：複製 skill 到 ~/.claude/skills/meeting-minutes-pro（Claude CLI 與桌面版 Code 分頁共用）
@@ -22,7 +22,7 @@
 
 set -eo pipefail
 
-VERSION="2.0.2"
+VERSION="2.1.0"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PAYLOAD="$HERE/payload"
 export PYTHONUTF8=1

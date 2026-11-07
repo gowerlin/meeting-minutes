@@ -28,7 +28,11 @@ description: 從 1.x 升級到 2.0 要注意什麼、升級時保留哪些檔，
 5. **新檔案**：輸出資料夾多了兩個字幕檔 `transcript.cues.srt`、`transcript.corrected.srt`，以及非會議類型的 `notes.md`、`notes.json`。原有檔案的格式不變。
 6. **有 NVIDIA 顯示卡**：升級時會問一次要不要裝 [GPU 說話者分離](/install/gpu)（預設不裝）。
 
-2.0.0 → 2.0.1 → <MmVersion />：功能、設定鍵、輸出檔都相同，重新執行安裝程式即可。各版改了什麼見[更版紀錄](/releases)。
+2.0.0 → 2.0.1 → 2.0.2：功能、設定鍵、輸出檔都相同，重新執行安裝程式即可。
+
+2.0.x → <MmVersion />：重新執行安裝程式即可。多了[網頁版](/features/web)（`meeting-minutes.html`／`notes.html`），`config.json` 會補上 `html` 區塊；既有的設定、詞表、輸出檔與入口題目都不變。
+
+各版改了什麼見[更版紀錄](/releases)。
 
 ## 解除安裝
 

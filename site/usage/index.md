@@ -35,6 +35,7 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 | `transcript.md` | 閱讀用逐字稿：時間碼、講者、畫面標記。交給 Claude 的就是這個 |
 | `transcript.corrected.md` | 校正版逐字稿（有做 AI 校正時） |
 | `meeting-minutes.md` 或 `notes.md` | 會議記錄或筆記（有做會議摘要時） |
+| `meeting-minutes.html` 或 `notes.html` | 網頁版，用瀏覽器打開，時間碼點了播放（見[網頁版](/features/web)） |
 | `transcript.cues.srt`、`transcript.corrected.srt` | 字幕（見[字幕](/features/subtitles)） |
 | `frames/` | 影片截圖，檔名裡的 `001523` 代表 00:15:23 |
 

@@ -107,6 +107,7 @@ const sidebar: DefaultTheme.Sidebar = {
         { text: '7 種內容類型', link: '/features/content-types' },
         { text: '自訂範本', link: '/features/custom-templates' },
         { text: '字幕', link: '/features/subtitles' },
+        { text: '網頁版', link: '/features/web' },
         { text: '說話者分離與講者人數', link: '/features/diarization' },
         { text: 'AI 校正與會議摘要', link: '/features/ai-correction' },
         { text: '提升準確度', link: '/features/accuracy' },

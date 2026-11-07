@@ -1,4 +1,4 @@
-"""測試共用設定：把版本目錄（預設 v2.0.2；MMP_TEST_VERSION=2.0.1、1.2.2 等可改測舊版）的 scripts 放上 sys.path，
+"""測試共用設定：把版本目錄（預設 v2.1.0；MMP_TEST_VERSION=2.0.2、1.2.2 等可改測舊版）的 scripts 放上 sys.path，
 並讓 MEETING_MINUTES_PRO_HOME 指向測試 home。
 
 測試一律不碰已安裝的 runtime：沒有設定 MEETING_MINUTES_PRO_HOME 時，自動建一個暫存目錄當測試 home。
@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-VERSION = os.environ.get("MMP_TEST_VERSION", "2.0.2")
+VERSION = os.environ.get("MMP_TEST_VERSION", "2.1.0")
 VER = tuple(int(x) for x in VERSION.split("."))
 # 〔1.2.2〕console 與輸出檔的分段單位：1.2.2 起「段」（「17 塊」在台灣易誤讀成 17 元），1.2.1 以前「塊」
 CHUNK_UNIT = "段" if VER >= (1, 2, 2) else "塊"

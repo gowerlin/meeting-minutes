@@ -10,6 +10,11 @@
 - 〔2.0.1〕第一次執行（沒有 state.json）、壞掉的 state.json、空的 state.json 三個情境；並且**每個情境**都檢查
   主控台（stdout）與 stderr 沒有錯誤訊息（ERROR_MARKERS：PowerShell 的錯誤記錄、bash 的錯誤、Python Traceback）。
   測 2.0.1 以後自動開啟；`MMP_TEST_NOERR=1` 可對舊版開啟（對照組：2.0.0 的 PowerShell 入口第一次執行會印 Get-Content 錯誤）。
+- 〔2.1.0〕網頁版（規格 2.1.0 §7.1）：假 auto_minutes.py 在 runtime 有 `common.html_setting`（2.1.0 起）時，照真的 auto_minutes.py
+  寫 `auto_minutes.json` 的 `html` 與 `.html` 檔（讀 config.json 的 `html.enabled`、`--no-html`）；`FAKE_HTML` 決定結果：
+  `found`（預設）／`explicit`／`none`／`unsupported`／`off`（＝`media`）、`failed:<reason>`（`status: failed`）。
+  v21_scenarios：可點播放／時間碼為文字的說明、非會議類型、設定關閉、失敗的黃字、沒整理時不列；2.0.2 config 升級（upgraded_202）。
+  檢查 `rows`：結束畫面的檔案列（依序）；1.x／2.0.x 升級的情境在 2.1.0 只多 `.html` 一列（測 2.0.2 時同一份清單去掉 `.html`）。
 
 用法：python entry_harness.py --work <暫存目錄> [--shell pwsh powershell bash] [--only 情境名 ...]
 """
@@ -34,6 +39,11 @@ NOERR = _testenv.VER >= (2, 0, 1) or os.environ.get("MMP_TEST_NOERR") == "1"
 ERROR_MARKERS = ("CategoryInfo", "FullyQualifiedErrorId", "Get-Content", "Select-String", "ConvertFrom-Json", "Exception",
                  "Line |", "+ ~", "Traceback", "No such file or directory", "command not found", "Permission denied",
                  "unbound variable", "syntax error")
+V21 = _testenv.VER >= (2, 1, 0)          # 〔2.1.0〕網頁版
+# 結束畫面列的檔名（兩支入口的清單，依序）；rows 檢查只看這些
+END_ROW_NAMES = ("meeting-minutes.md", "meeting-minutes.html", "notes.md", "notes.html", "notes.json", "transcript.corrected.md",
+                 "corrections.suggested.tsv", "transcript.md", "transcript.srt", "transcript.cues.srt",
+                 "transcript.corrected.srt", "frames")
 
 FAKE_TRANSCRIBE = r'''
 import json, os, shutil, sys, time
@@ -107,6 +117,19 @@ else:
     (out / "transcript.corrected.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nfake\n", encoding="utf-8")
     extra["subtitles"] = {"status": "ok", "cues": 40, "map_failed_paragraphs": 0, "doc_level": False}
 (out / name).write_text("# fake\n", encoding="utf-8")
+import common
+if KIND == "minutes" and hasattr(common, "html_setting"):   # 〔2.1.0〕網頁版：同真的 auto_minutes.py 的 auto_minutes.json／stdout
+    mode = os.environ.get("FAKE_HTML", "found")
+    hname = name[:-3] + ".html"
+    if not common.html_setting(common.load_config(), "enabled") or "--no-html" in a:
+        h = {"status": "skipped", "reason": "disabled", "output": None, "media": None, "timecodes": None}
+    elif mode.startswith("failed:"):
+        h = {"status": "failed", "reason": mode[7:], "output": None, "media": None, "timecodes": None}
+    else:
+        (out / hname).write_text("<!doctype html>\n", encoding="utf-8")
+        h = {"status": "ok", "reason": None, "output": hname, "media": mode, "timecodes": 3}
+    (out / "auto_minutes.json").write_text(json.dumps({"version": common.VERSION, "status": "ok", "html": h}), encoding="utf-8")
+    extra["html"] = {k: h[k] for k in ("status", "reason", "output", "media")}
 print(json.dumps({KIND: dict({"status": "ok", "reason": None, "provider": prov, "model": model, "chunks": 1, "chunks_ok": 1,
                               "parts": 1, "parts_ok": 1}, **extra)}, ensure_ascii=False))
 '''
@@ -200,7 +223,7 @@ def scenarios():
                                       ("notext", "AI 校正：")]),
         "upgraded_110_config": (["claude", "codex"], 0, "v110", None, ["", "", "", "", "", "", ""],
                                 [calls("transcribe", "correction", "minutes"), ("prompt", "要做 AI 校正嗎？[Y/n]"),
-                                 ("prompt", "要產生會議摘要嗎？[Y/n]")]),
+                                 ("prompt", "要產生會議摘要嗎？[Y/n]"), ("rows", MEETING_ROWS)]),
         "ask_default_false": (["claude", "codex"], 0, {"correction": {"ask_default": False}, "minutes": {"ask_default": False}},
                               None, ["", "", "", "", ""],
                               [calls("transcribe"), ("prompt", "要做 AI 校正嗎？[y/N]"), ("prompt", "要產生會議摘要嗎？[y/N]")]),
@@ -216,6 +239,65 @@ def scenarios():
     out.update(v2_scenarios())
     if NOERR:
         out.update(v201_scenarios())
+    if V21:
+        out.update(v21_scenarios())
+    return out
+
+
+# 〔2.1.0〕結束畫面的檔案列（依序）：會議、全部按 Enter（校正＋整理）；2.1.0 起多 meeting-minutes.html 一列
+MEETING_ROWS = [n for n in ("meeting-minutes.md", "meeting-minutes.html", "transcript.corrected.md", "transcript.md",
+                            "transcript.srt", "transcript.cues.srt", "transcript.corrected.srt") if V21 or not n.endswith(".html")]
+NEXT_MEETING = "下一步：打開 meeting-minutes.html（用瀏覽器）確認決議與待辦" if V21 else "下一步：打開 meeting-minutes.md 確認決議與待辦"
+NEXT_NOTES = "下一步：打開 notes.html（用瀏覽器）確認內容" if V21 else "下一步：打開 notes.md 確認內容"
+
+
+def v21_scenarios():
+    """〔2.1.0〕網頁版（規格 2.1.0 §7.1）：不加題目（答案與 2.0.2 相同）；結束畫面列 .html、括號依 auto_minutes.json 的
+    html.media；html.enabled 關或沒有產生時不列；失敗時一行說明與 render_html.py 補做的指令。"""
+    def calls(*kinds):
+        return ("calls", list(kinds))
+    all3 = ["", "", "", "", "", "", "", ""]
+    play = "會議記錄網頁版（用瀏覽器開；時間碼可點播放）"
+    text_ = "會議記錄網頁版（用瀏覽器開；時間碼為文字）"
+    base = [calls("transcribe", "correction", "minutes"), ("rows", MEETING_ROWS), ("text", NEXT_MEETING),
+            ("text", "附上 meeting-minutes.md 與 transcript.corrected.md。"), ("notext", "網頁版未產生")]
+    out = {
+        "html_found": (["claude", "codex"], 0, {}, None, all3, base + [("text", play), ("notext", "時間碼為文字")]),
+        "html_explicit": (["claude", "codex"], 0, {}, None, all3, base + [("text", play)], {"env": {"FAKE_HTML": "explicit"}}),
+    }
+    for m in ("none", "unsupported", "off"):
+        out[f"html_text_{m}"] = (["claude", "codex"], 0, {}, None, all3, base + [("text", text_), ("notext", "可點播放")],
+                                 {"env": {"FAKE_HTML": m}})
+    no_html = [("notext", "meeting-minutes.html"), ("notext", "網頁版"), ("text", "下一步：打開 meeting-minutes.md 確認決議與待辦"),
+               ("rows", [n for n in MEETING_ROWS if not n.endswith(".html")])]
+    out.update({
+        "html_course": (["claude", "codex"], 0, {}, None, ["2", "", "", "", "", "", "", ""],
+                        [calls("transcribe", "correction", "minutes"), ("text", "課程筆記網頁版（用瀏覽器開；時間碼可點播放）"),
+                         ("text", NEXT_NOTES), ("text", "附上 notes.md 與 transcript.corrected.md。"),
+                         ("rows", ["notes.md", "notes.html", "notes.json", "transcript.corrected.md", "transcript.md",
+                                   "transcript.srt", "transcript.cues.srt", "transcript.corrected.srt"])]),
+        "html_disabled": (["claude", "codex"], 0, {"html": {"enabled": False}}, None, all3,
+                          [calls("transcribe", "correction", "minutes")] + no_html),
+        "html_failed": (["claude", "codex"], 0, {}, None, all3,
+                        [calls("transcribe", "correction", "minutes"), ("notext", "會議記錄網頁版"),
+                         ("text", "網頁版未產生（找不到網頁版樣板 html_template.html）；可執行 render_html.py 補做："),
+                         ("text", "render_html.py\" \""), ("text", "下一步：打開 meeting-minutes.md 確認決議與待辦"),
+                         ("rows", [n for n in MEETING_ROWS if not n.endswith(".html")])],
+                        {"env": {"FAKE_HTML": "failed:template_missing"}}),
+        "html_failed_internal": (["claude", "codex"], 0, {}, None, all3,
+                                 [calls("transcribe", "correction", "minutes"),
+                                  ("text", "網頁版未產生（程式錯誤）；可執行 render_html.py 補做")],
+                                 {"env": {"FAKE_HTML": "failed:internal_error"}}),
+        # 沒有整理（② 回答 n）：沒有 auto_minutes.json，不列網頁版、不說明失敗
+        "html_minutes_no": (["claude", "codex"], 0, {}, None, ["", "", "", "", "", "n", ""],
+                            [calls("transcribe", "correction"), ("notext", "網頁版"), ("notext", ".html")]),
+        # 2.0.2 的 config.json 升級（common.upgrade_config 補 html 區塊：enabled true）→ 全部按 Enter：只多 .html 一列
+        "upgraded_202": (["claude", "codex"], 0, "v202", None, all3,
+                         [calls("transcribe", "correction", "minutes"), ("targ2", "--type", "meeting"),
+                          ("targ_not", "--speakers"), ("targ_not", "--no-diarize"), ("targ_not", "--hotwords"),
+                          ("targ_not", "--whisper"), ("marg2", "--type", "meeting"), ("text", "內容類型（Enter＝會議）"),
+                          ("rows", MEETING_ROWS), ("text", play), ("text", NEXT_MEETING), ("cfg_html", True)]),
+    })
     return out
 
 
@@ -257,13 +339,13 @@ def v2_scenarios():
                           ("targ_not", "--whisper"), ("marg2", "--type", "meeting"), ("text", "內容類型（Enter＝會議）"),
                           ("text", "1 會議（含業務／客戶會議）"), ("text", "7 客戶／需求訪談"), ("wait", "ask_type"),
                           ("wait", "ask_speakers"), ("state", "meeting"), ("text", "會議摘要：OpenAI gpt-6.1-sol"),
-                          ("text", "meeting-minutes.md"), ("text", "下一步：打開 meeting-minutes.md")]),
+                          ("text", "meeting-minutes.md"), ("text", NEXT_MEETING), ("rows", MEETING_ROWS)]),
         "type_course_skip": (["claude", "codex"], 0, {}, None, ["2", "s", "", "", "", "", "", ""],
                              [calls("transcribe", "correction", "minutes"), ("targ2", "--type", "course"),
                               ("targ", "--no-diarize"), ("targ_not", "--speakers"), ("marg2", "--type", "course"),
                               ("text", "內容類型：課程（含演講／專題分享）"), ("text", "課程筆記：OpenAI gpt-6.1-sol"),
                               ("text", "notes.md"), ("text", "課程筆記（AI 自動整理，未經人工確認）"), ("text", "notes.json"),
-                              ("text", "下一步：打開 notes.md"), ("text", "檢查這份課程筆記"), ("notext", "meeting-minutes.md"),
+                              ("text", NEXT_NOTES), ("text", "檢查這份課程筆記"), ("notext", "meeting-minutes.md"),
                               ("state", "course"), ("wait", "ask_type")]),
         "template_menu": (["claude", "codex"], 0, {}, None, ["9", "", "", "n", "", "", ""],
                           [calls("transcribe", "minutes"), ("text", "8 讀書會［自訂：課程］"),
@@ -314,9 +396,20 @@ V122_CONFIG = dict(V110_CONFIG, runtime_version="1.2.2",
                             "openai": {"model": "gpt-6.1-sol", "effort": "low"}})
 
 
+def v202_config() -> dict:
+    """〔2.1.0〕2.0.2 安裝後的 config.json：2.0.2 的 common.DEFAULTS＋安裝程式寫的 backend／device／whisper。"""
+    scripts = HERE.parent / "meeting-minutes-pro-v2.0.2" / "payload" / "runtime" / "scripts"
+    out = subprocess.run([sys.executable, "-B", "-c",
+                          "import json, sys; sys.path.insert(0, sys.argv[1]); import common; print(json.dumps(common.DEFAULTS))",
+                          str(scripts)], check=True, capture_output=True, text=True, encoding="utf-8",
+                         env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1")).stdout
+    return dict({"backend": "openvino", "device": "NPU", "whisper": "turbo"}, **json.loads(out))
+
+
 def write_config(mmh: Path, cfg):
-    if cfg in ("v110", "v122"):
-        old = V110_CONFIG if cfg == "v110" else V122_CONFIG
+    if cfg in ("v110", "v122", "v202"):
+        old = {"v110": V110_CONFIG, "v122": V122_CONFIG}.get(cfg) or v202_config()
+        assert cfg != "v202" or (old["runtime_version"] == "2.0.2" and "html" not in old)
         (mmh / "config.json").write_text(json.dumps(old, ensure_ascii=False), encoding="utf-8")
         # 安裝程式升級（common.upgrade_config）：用真的 common.py 跑在假 runtime 上
         subprocess.run([str(mmh / "venv" / "Scripts" / "python.exe"), "-B", "-c",
@@ -458,6 +551,18 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
         elif c[0] == "count":
             if text.count(c[1]) != c[2]:
                 fails.append(f"「{c[1]}」出現 {text.count(c[1])} 次 != {c[2]}")
+        elif c[0] == "rows":                            # 〔2.1.0〕結束畫面的檔案列（依序）
+            got = [ln[2:].split()[0] for ln in outs.splitlines()
+                   if ln.startswith("  ") and ln[2:3] != " " and ln[2:].split()[0] in END_ROW_NAMES]
+            if got != c[1]:
+                fails.append(f"結束畫面檔案列 {got} != {c[1]}")
+        elif c[0] == "cfg_html":
+            try:
+                got = json.loads((mmh / "config.json").read_text(encoding="utf-8")).get("html", {}).get("enabled")
+            except (OSError, ValueError):
+                got = None
+            if got is not c[1]:
+                fails.append(f"config.json html.enabled {got!r} != {c[1]!r}")
         elif c[0] == "notext":
             if c[1] in text:
                 fails.append(f"不該出現「{c[1]}」")

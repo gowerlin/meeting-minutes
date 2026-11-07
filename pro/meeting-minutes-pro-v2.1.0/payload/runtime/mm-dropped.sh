@@ -1,9 +1,12 @@
 #!/bin/bash
-# macOS：拖放到「會議轉寫（Pro）.app」或以它開啟檔案時，在「終端機」中執行的轉寫腳本（meeting-minutes-pro 2.0.2）
+# macOS：拖放到「會議轉寫（Pro）.app」或以它開啟檔案時，在「終端機」中執行的轉寫腳本（meeting-minutes-pro 2.1.0）
 # 流程（1.2.0）：先問轉寫要用的資訊 → 轉寫 → 逐字稿完成後依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（按 Enter＝是）
 # 〔1.2.2〕每次詢問（含最後的「按 Enter 關閉」）前先清空鍵盤緩衝（flush_input）
 # 〔2.0.0〕轉寫前的提問：內容類型（含自訂範本；記住上次，$MMH/state.json）→ 講者人數／s 略過 → 專有名詞 → Breeze（規格 §7.1、§7.2）；
 #         整理的題目與輸出依類型（會議：meeting-minutes.md；其他：notes.md）；結束畫面列字幕、說話者分離退回與零星講者（§7.4）
+# 〔2.1.0〕網頁版（規格 2.1.0 §7.1）：不加題目；auto_minutes.py 會接著產生 meeting-minutes.html／notes.html。結束畫面讀
+#         auto_minutes.json 的 html：產生成功才列 .html（括號依 media：found／explicit「時間碼可點播放」，其他「時間碼為文字」），
+#         「下一步」改成打開 .html；網頁版失敗時多一行說明（原因與 render_html.py 補做的指令）
 # 本腳本由安裝程式放在 runtime 根目錄；讓轉寫腳本用同一個位置（也支援 MEETING_MINUTES_PRO_HOME 改放的位置）
 MMH="$(cd "$(dirname "$0")" && pwd)"
 export MEETING_MINUTES_PRO_HOME="$MMH"
@@ -373,6 +376,7 @@ ai_step() {
     if [ "$sec" = "correction" ]; then args=("$SCR/auto_correct.py" "$out" --force --correct-provider "$prov" --correct-model "$model")
     else args=("$SCR/auto_minutes.py" "$out" --force "${TYPE_ARGS[@]}" --minutes-provider "$prov" --minutes-model "$model"); fi
     res="$("$PY" "${args[@]}")"          # 進度寫在 stderr（直接顯示）；stdout 最後一行是 JSON 摘要
+    [ "$sec" = "minutes" ] && MINS_RAN=1   # 〔2.1.0〕這次有執行整理（結束畫面判斷要不要說明網頁版失敗）
     last="$(printf '%s\n' "$res" | tail -n 1)"
     info="$(printf '%s' "$last" | "$PY" -c 'import json,sys
 try:
@@ -442,7 +446,7 @@ except Exception:
 d = j.get("duration")
 print("\t".join(str(x) for x in (j.get("out_dir") or "-", "-" if d is None else d)))' 2>/dev/null)"
     IFS="$(printf '\t')" read -r out dur <<< "$info"
-    CUE_NOTE="$(printf '%s' "$last" | "$PY" -c "$CUE_NOTE_PY" cues 2>/dev/null)"; COR_NOTE=""
+    CUE_NOTE="$(printf '%s' "$last" | "$PY" -c "$CUE_NOTE_PY" cues 2>/dev/null)"; COR_NOTE=""; MINS_RAN=""
     { [ -n "$out" ] && [ "$out" != "-" ]; } || out="${f%.*}_minutes"
     [ "$dur" = "-" ] && dur=""
     if [ -n "$FIRST" ]; then
@@ -473,13 +477,26 @@ print("\t".join(str(x) for x in (j.get("out_dir") or "-", "-" if d is None else 
 
     # ------------------------------------------------------------------ 結束畫面：產出的檔案與 log 位置
     echo; echo "完成：$out"
-    for x in "meeting-minutes.md|會議記錄（AI 自動整理，未經人工確認）" "notes.md|${THING}（AI 自動整理，未經人工確認）" \
+    # 〔2.1.0〕網頁版：auto_minutes.json 的 html（status ok 且檔案在才列；html.enabled 關或沒有產生時不列）
+    hinfo="$("$PY" -c 'import json,sys
+try:
+    h = json.load(open(sys.argv[1], encoding="utf-8")).get("html") or {}
+except Exception:
+    h = {}
+print("\t".join(str(h.get(k) or "-") for k in ("status", "reason", "output", "media")))' "$out/auto_minutes.json" 2>/dev/null)"
+    IFS="$(printf '\t')" read -r h_st h_rs h_out h_media <<< "$hinfo"
+    HTML_FILE=""; { [ "$h_st" = "ok" ] && [ -n "$h_out" ] && [ "$h_out" != "-" ] && [ -f "$out/$h_out" ]; } && HTML_FILE="$h_out"
+    case "$h_media" in found|explicit) TC_NOTE="時間碼可點播放" ;; *) TC_NOTE="時間碼為文字" ;; esac
+    for x in "meeting-minutes.md|會議記錄（AI 自動整理，未經人工確認）" "meeting-minutes.html|會議記錄網頁版（用瀏覽器開；$TC_NOTE）" \
+             "notes.md|${THING}（AI 自動整理，未經人工確認）" "notes.html|${THING}網頁版（用瀏覽器開；$TC_NOTE）" \
              "notes.json|筆記的結構化資料（改過後執行 auto_minutes.py --render-only 重新產生 notes.md）" \
              "transcript.corrected.md|校正版逐字稿（AI 校正，標出每一處修改）" \
              "corrections.suggested.tsv|對照表建議（尚未生效）" "transcript.md|逐字稿（原稿）" "transcript.srt|字幕檔（一段一條）" \
              "transcript.cues.srt|字幕（依字幕規則切條，不經 AI）$CUE_NOTE" "transcript.corrected.srt|校正版字幕$COR_NOTE" \
              "frames|影片截圖"; do
-        n="${x%%|*}"; [ -e "$out/$n" ] && printf '  %-26s %s\n' "$n" "${x#*|}"
+        n="${x%%|*}"
+        case "$n" in *.html) [ "$n" = "$HTML_FILE" ] || continue ;; esac
+        [ -e "$out/$n" ] && printf '  %-26s %s\n' "$n" "${x#*|}"
     done
     echo "  執行 log：$out/run_log.jsonl"
     echo "  歷次執行摘要：$MMH/logs/runs.jsonl（彙整：\"$PY\" \"$SCR/runlog.py\" summary）"
@@ -503,10 +520,22 @@ if minor:
     print("講者 %s 發言很少，可能是分離誤判（見 transcript.md 表頭）；確定人數時可重跑並填人數" % "、".join(minor))' "$out/transcript.json" "$SCR" 2>/dev/null)"
     [ -n "$extra" ] && printf '%s\n' "$extra"
     if [ -f "$out/transcript.corrected.md" ]; then src=transcript.corrected.md; else src=transcript.md; fi
+    # 〔2.1.0〕這次有整理、但網頁版沒產生（failed）：說明原因與補做的指令
+    if [ -n "$MINS_RAN" ] && [ "$h_st" = "failed" ]; then
+        case "$h_rs" in
+            template_missing) hw="找不到網頁版樣板 html_template.html" ;;
+            write_failed) hw="寫入檔案失敗" ;;
+            internal_error) hw="程式錯誤" ;;
+            *) hw="$h_rs" ;;
+        esac
+        echo "網頁版未產生（$hw）；可執行 render_html.py 補做：\"$PY\" \"$SCR/render_html.py\" \"$out\""
+    fi
     if [ -f "$out/meeting-minutes.md" ]; then
-        echo "下一步：打開 meeting-minutes.md 確認決議與待辦；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份會議記錄」，附上 meeting-minutes.md 與 $src。"
+        open_f="meeting-minutes.md "; [ "$HTML_FILE" = "meeting-minutes.html" ] && open_f="meeting-minutes.html（用瀏覽器）"
+        echo "下一步：打開 ${open_f}確認決議與待辦；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份會議記錄」，附上 meeting-minutes.md 與 $src。"
     elif [ "$SEL_TYPE" != "meeting" ] && [ -f "$out/notes.md" ]; then
-        echo "下一步：打開 notes.md 確認內容；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份${THING}」，附上 notes.md 與 $src。"
+        open_f="notes.md "; [ "$HTML_FILE" = "notes.html" ] && open_f="notes.html（用瀏覽器）"
+        echo "下一步：打開 ${open_f}確認內容；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份${THING}」，附上 notes.md 與 $src。"
     elif [ "$src" = "transcript.corrected.md" ]; then
         echo "下一步：在 Claude 中說「用 meeting-minutes-pro 整理這份${THING}」，附上 transcript.corrected.md（已自動校正，只剩待確認與講者對應；影片可一併附上 frames 內的截圖）。"
     else

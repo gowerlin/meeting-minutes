@@ -240,7 +240,9 @@ def mock_argv(argv):
 
 # 〔2.0.0〕U-1（規格 §9.1、§10.2）：1.0.0／1.1.0／1.2.2 的 config.json 經 upgrade_config()
 V2 = _testenv.VER >= (2, 0, 0)
-V2_BLOCKS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"]
+V21 = _testenv.VER >= (2, 1, 0)
+# 〔2.1.0〕升級時另補 html 區塊（規格 2.1.0 §6.1）；2.0.x 只補 2.0 的五塊
+V2_BLOCKS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] + (["html"] if V21 else [])
 V110_CONFIG = dict(copy.deepcopy(V100_CONFIG), runtime_version="1.1.0",
                    punctuation={"enabled": True, "model": "ct-transformer-int8", "paragraph_gap": 2.5,
                                 "paragraph_max_chars": 200, "whisper_density": 20},
@@ -282,7 +284,8 @@ class UpgradeTo200(TempHome):
         after = self.upgrade(copy.deepcopy(V122_CONFIG))
         added = common.added_config_keys(V122_CONFIG, after)
         msg = "config.json 已補上新版設定鍵：{0}（既有的值不變）".format("、".join(added))
-        self.assertEqual(msg, "config.json 已補上新版設定鍵：content_type、diarization、keyframes、content_types、subtitles（既有的值不變）")
+        self.assertEqual(msg, "config.json 已補上新版設定鍵：content_type、diarization、keyframes、content_types、subtitles"
+                         + ("、html" if V21 else "") + "（既有的值不變）")
 
     def test_partial_blocks(self):
         before = dict(copy.deepcopy(V122_CONFIG), runtime_version="2.0.0",
@@ -319,6 +322,54 @@ class UpgradeTo200(TempHome):
         self.assertEqual(common.templates_dir(), Path(self.home, "templates"))
         self.assertEqual(common.pyannote_model_dir(), Path(self.home, "models", "pyannote-speaker-diarization-community-1"))
         self.assertEqual(common.gpu_diar_python().parent.parent, Path(self.home, "venv-gpu-diar"))
+
+
+@unittest.skipUnless(V21, "2.1.0 才有")
+class UpgradeTo210(TempHome):
+    """H-11（規格 2.1.0 §6.1）：upgrade_config() 補 html 區塊；只有部分鍵時逐鍵補；不認得的值保留原樣，讀取時用預設並印提示。"""
+
+    def upgrade(self, before):
+        self.write(before)
+        return common.upgrade_config()
+
+    def test_defaults(self):
+        self.assertEqual(common.DEFAULTS["html"], {"enabled": True, "media": "auto", "theme": "dark"})
+        for k, v in common.DEFAULTS["html"].items():
+            self.assertEqual(common.html_setting({}, k), v)
+
+    def test_no_html_block(self):
+        before = dict(copy.deepcopy(V122_CONFIG), runtime_version="2.0.2")
+        after = self.upgrade(copy.deepcopy(before))
+        self.assertEqual(after["html"], common.DEFAULTS["html"])
+        self.assertIs(after["html"]["enabled"], True)                          # 〔2.1.0〕升級上來的使用者也預設產出（規格 2.1.0 §6.1）
+        self.assertEqual(after["runtime_version"], "2.1.0")
+        self.assertIn("html", common.added_config_keys(before, after))
+
+    def test_partial_keys(self):
+        before = dict(copy.deepcopy(V122_CONFIG), runtime_version="2.0.2", html={"enabled": False})
+        after = self.upgrade(copy.deepcopy(before))
+        self.assertEqual(after["html"], {"enabled": False, "media": "auto", "theme": "dark"})   # 既有值不變、缺的逐鍵補
+        self.assertEqual([k for k in common.added_config_keys(before, after) if k.startswith("html")], ["html.media", "html.theme"])
+        again = self.upgrade(copy.deepcopy(after))
+        self.assertEqual(again, after)
+
+    def test_unknown_values(self):
+        before = dict(copy.deepcopy(V122_CONFIG), html={"enabled": "yes", "media": "yes", "theme": "blue"})
+        after = self.upgrade(copy.deepcopy(before))
+        self.assertEqual(after["html"], {"enabled": "yes", "media": "yes", "theme": "blue"})   # 使用者寫的值不改
+        msgs = []
+        self.assertIs(common.html_setting(after, "enabled", warn=msgs.append), True)
+        self.assertEqual(common.html_setting(after, "media", warn=msgs.append), "auto")
+        self.assertEqual(common.html_setting(after, "theme", warn=msgs.append), "dark")
+        self.assertEqual(msgs, ["[!] html.enabled 的值 yes 不認得，改用 true", "[!] html.media 的值 yes 不認得，改用 auto",
+                                "[!] html.theme 的值 blue 不認得，改用 dark"])
+        import io
+        import contextlib
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(common.html_setting({"html": {"media": 1}}, "media"), "auto")
+        self.assertIn("[!] html.media 的值 1 不認得，改用 auto", err.getvalue())
+        self.assertIs(common.html_setting({"html": {"enabled": False}}, "enabled", warn=msgs.append), False)
 
 
 if __name__ == "__main__":

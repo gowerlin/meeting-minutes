@@ -193,16 +193,31 @@ def split_long(audio: np.ndarray, s: float, e: float, max_len: float = MAX_WIN) 
 
 
 # ---------------------------------------------------------------- ASR
+# 〔2.1.0〕console 顯示用的模型名稱（config 的 whisper 值 → 顯示名稱）。別名改印完整模型名；
+# 不在表上的值（例如 --whisper 直接給 Hugging Face repo）印「Whisper <原值>」。
+ASR_DISPLAY = {
+    "breeze": "Breeze-ASR-25",
+    "turbo": "Whisper large-v3-turbo",
+    "large-v3": "Whisper large-v3",
+    "base": "Whisper base",
+}
+
+
+def asr_display_name(model: str) -> str:
+    return ASR_DISPLAY.get(model, f"Whisper {model}")
+
+
 def load_asr(backend: str, model: str, device: str, compute_type: str, language, hotwords):
     """依 config 載入，不做即時偵測；失敗就明確告知重新偵測。"""
     import backends
+    name = asr_display_name(model)
     t0 = time.time()
     try:
         b = backends.create(backend, model, device, language, hotwords, compute_type)
     except Exception as ex:  # noqa: BLE001
-        sys.exit(f"無法以 {backend}/{device} 載入 Whisper：{ex}\n"
+        sys.exit(f"無法以 {backend}/{device} 載入 {name}：{ex}\n"
                  "硬體或驅動可能已變更，請重新執行 install.cmd（或 setup_backend.py）重新偵測。")
-    log(f"  Whisper 載入：{backend} / {device}（{time.time() - t0:.1f}s）")
+    log(f"  {name} 載入：{backend} / {device}（{time.time() - t0:.1f}s）")
     return b
 
 

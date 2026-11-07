@@ -2,6 +2,7 @@
 
 > 給對話中整理筆記用（Claude Code／Claude App）。runtime 的 `auto_minutes.py --type <代號>` 用同一份規則與版面（程式的提示詞全文在 `scripts/content_types.py`，本檔與它一致）。
 > 會議（`meeting`）照 `minutes-template.md` 寫 `meeting-minutes.md`；其他 6 種寫 `notes.md`（runtime 另產生 `notes.json`）。
+> 〔2.1.0〕網頁版（`notes.html`、`meeting-minutes.html`）由程式（`scripts/render_html.py`）從 `.md` 轉出：請維持標題、表頭與時間碼的寫法（`#` 標題、`##`／`###` 節標題、開頭的「> 自動整理：…」表頭與資訊表、`HH:MM:SS` 時間碼），網頁版的目錄、摘要卡與時間碼才會正確。
 
 ## 怎麼選類型
 

@@ -1,5 +1,5 @@
 ﻿<#
-  meeting-minutes-pro 2.0.2 一鍵安裝程式
+  meeting-minutes-pro 2.1.0 一鍵安裝程式
   - 共用 runtime：%LOCALAPPDATA%\meeting-minutes-pro（Python venv、模型、轉寫腳本、glossary、config）
     設定環境變數 MEETING_MINUTES_PRO_HOME 可改放到其他位置
   - 目標 CLI ：複製 skill 到 %USERPROFILE%\.claude\skills\meeting-minutes-pro（Claude CLI 與桌面版 Code 分頁共用）
@@ -48,7 +48,7 @@ $ProgressPreference = "SilentlyContinue"   # PS 5.1 的下載進度條會讓 Inv
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PYTHONUTF8 = "1"
-$Version   = "2.0.2"
+$Version   = "2.1.0"
 $Here      = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Payload   = Join-Path $Here "payload"
 if ($env:MEETING_MINUTES_PRO_HOME) { $MMH = $env:MEETING_MINUTES_PRO_HOME }

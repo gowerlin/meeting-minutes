@@ -69,6 +69,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" [--type <代號> | --template <代號>] [--openai | --claude] [--minutes-model opus] [--force]
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --render-only   # 改過 notes.json 後重新產生 notes.md
 "$MMH/venv/bin/python" "$MMH/scripts/subtitles.py" "<檔名>_minutes" --corrected        # 改過校正版逐字稿後重新產生字幕
+"$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes"                   # 手改 .md 後重新產生網頁版（2.1）
 "$MMH/venv/bin/python" "$MMH/scripts/templates.py" check                              # 檢查自訂範本
 "$MMH/venv/bin/python" "$MMH/scripts/runlog.py" summary                               # 執行 log 彙整
 ```
@@ -109,6 +110,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `subtitles.speaker_label` | `change` | 講者標示：`change`（換人時）／`always`／`none` |
 | `subtitles.uncertain` | `orig` | 待確認的字在字幕裡怎麼顯示：`orig`／`guess`／`mark` |
 | `subtitles.max_line_chars`／`.max_lines`／`.min_sec`／`.max_sec`／`.max_cps` | `16`／`2`／`0.833`／`7.0`／`9` | 字幕規則 |
+| `html.enabled`／`.media`／`.theme` | `true`／`auto`／`dark` | [網頁版](/features/web)：是否產生、是否放播放器（`off`＝時間碼一律文字）、第一次開啟的主題（2.1） |
 
 ## 安裝程式的參數
 

@@ -34,7 +34,7 @@ Claude App 裡的 skill 在雲端的沙盒中執行，用不到你電腦的顯�
 
 輸出資料夾裡有 `meeting-minutes.md`：
 
-1. 先打開它，確認決議與待辦。
+1. 先打開它（或用瀏覽器打開同一個資料夾裡的 `meeting-minutes.html`，點時間碼可以回聽），確認決議與待辦。
 2. 要補講者姓名或修改：在 Claude App 附上 `meeting-minutes.md` 與 `transcript.corrected.md`（沒有就附 `transcript.md`），說：
 
    > **用 meeting-minutes-pro 檢查這份會議記錄**

@@ -60,3 +60,6 @@
 - 字幕：transcript.cues.srt（N 條）、transcript.corrected.srt（N 條，對應失敗 N 段）（有才寫）
 
 </details>
+
+<!-- 以下是寫法說明，不要寫進會議記錄 -->
+〔寫法說明，不寫進會議記錄｜2.1.0〕網頁版（`meeting-minutes.html`）由程式（`scripts/render_html.py`）從本檔的寫法轉出：請維持標題、表頭與時間碼的寫法（`#` 會議名稱、`## 一、…` 節標題、開頭的資訊表、決議／待辦／待釐清三張表的表頭、`HH:MM:SS` 時間碼），網頁版的目錄、摘要卡與時間碼才會正確。

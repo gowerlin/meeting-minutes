@@ -1,10 +1,13 @@
-﻿# 檔案總管右鍵「傳送到 → 會議轉寫（Pro）」的執行腳本（meeting-minutes-pro 2.0.2）
+﻿# 檔案總管右鍵「傳送到 → 會議轉寫（Pro）」的執行腳本（meeting-minutes-pro 2.1.0）
 # 流程（1.2.0）：先問轉寫要用的資訊 → 轉寫 → 逐字稿完成後依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（按 Enter＝是）
 # 〔1.2.2〕每次詢問（含最後的「按 Enter 關閉」）前先清空鍵盤緩衝（Clear-KeyBuffer）
 # 〔2.0.0〕轉寫前的提問：內容類型（含自訂範本；記住上次，$MMH\state.json）→ 講者人數／s 略過 → 專有名詞 → Breeze（規格 §7.1、§7.2）；
 #         整理的題目與輸出依類型（會議：meeting-minutes.md；其他：notes.md）；結束畫面列字幕、說話者分離退回與零星講者（§7.4）
 # 〔2.0.1〕讀檔的 cmdlet 加 -ErrorAction Stop：Get-Content／Select-String 找不到檔案是「非終止錯誤」，try/catch 抓不到，
 #         會在主控台印紅字（第一次執行時 state.json 還不存在）。現在讀不到、壞掉的 JSON 都安靜地當作沒有
+# 〔2.1.0〕網頁版（規格 2.1.0 §7.1）：不加題目；auto_minutes.py 會接著產生 meeting-minutes.html／notes.html。結束畫面讀
+#         auto_minutes.json 的 html：產生成功才列 .html（括號依 media：found／explicit「時間碼可點播放」，其他「時間碼為文字」），
+#         「下一步」改成打開 .html；網頁版失敗時多一行黃字（原因與 render_html.py 補做的指令）
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Files)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PYTHONUTF8 = "1"
@@ -442,9 +445,17 @@ foreach ($f in $Files) {
     Write-Host "`n完成：$out" -ForegroundColor Green
     $cueNote = Cue-Note (Get-Opt $res @("subtitles", "cues")) $false
     $corNote = Cue-Note (Get-Opt $corr @("subtitles")) $true
+    # 〔2.1.0〕網頁版：auto_minutes.json 的 html（status ok 且檔案在才列；html.enabled 關或沒有產生時不列）
+    $html = $null
+    try { $html = (Get-Content -LiteralPath (Join-Path $out "auto_minutes.json") -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json).html } catch { }
+    $htmlFile = [string](Get-Opt $html @("output"))
+    if ([string](Get-Opt $html @("status")) -ne "ok" -or -not $htmlFile -or -not (Test-Path -LiteralPath (Join-Path $out $htmlFile))) { $htmlFile = "" }
+    $tcNote = "時間碼為文字"; if (@("found", "explicit") -contains [string](Get-Opt $html @("media"))) { $tcNote = "時間碼可點播放" }
     foreach ($x in @(
             @("meeting-minutes.md", "會議記錄（AI 自動整理，未經人工確認）"),
+            @("meeting-minutes.html", "會議記錄網頁版（用瀏覽器開；$tcNote）"),
             @("notes.md", "${Thing}（AI 自動整理，未經人工確認）"),
+            @("notes.html", "${Thing}網頁版（用瀏覽器開；$tcNote）"),
             @("notes.json", "筆記的結構化資料（改過後執行 auto_minutes.py --render-only 重新產生 notes.md）"),
             @("transcript.corrected.md", "校正版逐字稿（AI 校正，標出每一處修改）"),
             @("corrections.suggested.tsv", "對照表建議（尚未生效）"),
@@ -453,6 +464,7 @@ foreach ($f in $Files) {
             @("transcript.cues.srt", "字幕（依字幕規則切條，不經 AI）$cueNote"),
             @("transcript.corrected.srt", "校正版字幕$corNote"),
             @("frames", "影片截圖"))) {
+        if ($x[0] -like "*.html" -and $x[0] -ne $htmlFile) { continue }
         if (Test-Path -LiteralPath (Join-Path $out $x[0])) { Write-Host ("  {0,-26} {1}" -f $x[0], $x[1]) }
     }
     Write-Host "  執行 log：$(Join-Path $out 'run_log.jsonl')"
@@ -472,10 +484,19 @@ foreach ($f in $Files) {
     }
     $hasCorr = Test-Path -LiteralPath (Join-Path $out "transcript.corrected.md")
     $srcName = "transcript.md"; if ($hasCorr) { $srcName = "transcript.corrected.md" }
+    # 〔2.1.0〕這次有整理、但網頁版沒產生（failed）：黃字說明原因與補做的指令
+    if ($mins -and [string](Get-Opt $html @("status")) -eq "failed") {
+        $hr = [string](Get-Opt $html @("reason"))
+        $hw = @{ template_missing = "找不到網頁版樣板 html_template.html"; write_failed = "寫入檔案失敗"; internal_error = "程式錯誤" }[$hr]
+        if (-not $hw) { $hw = $hr }
+        Write-Host ("網頁版未產生（{0}）；可執行 render_html.py 補做：`"{1}`" `"{2}`" `"{3}`"" -f $hw, $Py, (Join-Path $Scripts "render_html.py"), $out) -ForegroundColor Yellow
+    }
     if (Test-Path -LiteralPath (Join-Path $out "meeting-minutes.md")) {
-        Write-Host "下一步：打開 meeting-minutes.md 確認決議與待辦；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份會議記錄」，附上 meeting-minutes.md 與$(if ($hasCorr) { ' transcript.corrected.md' } else { ' transcript.md' })。"
+        $open = "meeting-minutes.md "; if ($htmlFile -eq "meeting-minutes.html") { $open = "meeting-minutes.html（用瀏覽器）" }
+        Write-Host "下一步：打開 ${open}確認決議與待辦；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份會議記錄」，附上 meeting-minutes.md 與$(if ($hasCorr) { ' transcript.corrected.md' } else { ' transcript.md' })。"
     } elseif ($sel.type -ne "meeting" -and (Test-Path -LiteralPath (Join-Path $out "notes.md"))) {
-        Write-Host "下一步：打開 notes.md 確認內容；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份${Thing}」，附上 notes.md 與 ${srcName}。"
+        $open = "notes.md "; if ($htmlFile -eq "notes.html") { $open = "notes.html（用瀏覽器）" }
+        Write-Host "下一步：打開 ${open}確認內容；要補講者姓名或修改，在 Claude 中說「用 meeting-minutes-pro 檢查這份${Thing}」，附上 notes.md 與 ${srcName}。"
     } elseif ($hasCorr) {
         Write-Host "下一步：在 Claude 中說「用 meeting-minutes-pro 整理這份${Thing}」，附上 transcript.corrected.md（已自動校正，只剩待確認與講者對應；影片可一併附上 frames 內的截圖）。"
     } else {

@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "2.0.2"
+VERSION = "2.1.0"
 
 # backend -> alias -> Hugging Face repo id
 WHISPER_MODELS = {
@@ -134,13 +134,23 @@ DEFAULTS = {
         "speaker_label": "change",       # change | always | none
         "uncertain": "orig",             # orig | guess | mark（U6）
     },
+    # ---------------------------------------------------------------- 〔2.1.0〕網頁版（規格 2.1.0 §6.1）
+    "html": {
+        "enabled": True,                 # auto_minutes.py 寫完 .md 後產生網頁版（規格 2.1.0 §6.1：預設產出）
+        "media": "auto",                 # auto＝依規格 §5.2 找原始媒體並放播放器；off＝不放播放器（時間碼一律純文字）
+        "theme": "dark",                 # dark | light：網頁版第一次開啟時的主題（之後依使用者在頁面上的選擇）
+    },
 }
+# 〔2.1.0〕html 區塊每個鍵認得的值（不認得 → 用預設並印提示，html_setting()）
+HTML_CHOICES = {"enabled": (True, False), "media": ("auto", "off"), "theme": ("dark", "light")}
 # 〔2.0.0〕content_types.<代號> 允許的鍵 → 對應的共用鍵（規格 §6.1：type_setting() 的退回順序）
 TYPE_SETTING_SHARED = {"cluster_threshold": "diarization.cluster_threshold", "scene": "keyframes.scene",
                        "diarize_engine": "diarization.engine"}       # 〔2.0.0〕diarize_engine：類型別的說話者分離引擎
 # 〔2.0.0〕upgrade_config() 補的 2.0 區塊；巢狀區塊只有部分鍵時逐鍵補（content_types 由使用者增刪，只在整塊不存在時寫入）
 V2_BLOCKS = ("content_type", "diarization", "keyframes", "content_types", "subtitles")
 V2_DEEP_FILL = ("content_type", "diarization", "keyframes", "subtitles")
+# 〔2.1.0〕upgrade_config() 補的 2.1 區塊（做法同 V2_BLOCKS：整塊不存在就寫入，部分鍵存在時逐鍵補）
+V21_BLOCKS = ("html",)
 LEGACY_CLAUDE_TOP = ("enabled", "channel", "chunk_chars", "timeout_sec", "confirm_over_minutes")
 _MISSING = object()
 
@@ -341,6 +351,8 @@ def upgrade_config(correction: dict | None = None) -> dict:
     - 〔2.0.0〕content_type、diarization、keyframes、content_types、subtitles：整塊不存在才寫入預設值
       （diarization.pyannote.status 寫 none；之後只由安裝程式改）；content_type、diarization、keyframes、subtitles
       只有部分鍵時逐鍵補上缺的鍵（既有的值不變）；content_types 由使用者增刪，只在整塊不存在時寫入。
+    - 〔2.1.0〕html：整塊不存在才寫入預設值（enabled: true）；只有部分鍵時逐鍵補上缺的鍵。使用者寫的值（含不認得的值）
+      照原樣保留，讀取時由 html_setting() 改用預設並印提示。
     - correction 參數（安裝程式的明確選擇，例 -Correct、-CorrectProvider openai、{"openai": {"model": …}}）
       不論區塊是否已存在都會寫入；巢狀的 claude／openai／corrections_auto 逐鍵合併。
     - runtime_version 每次都更新成 VERSION。
@@ -348,10 +360,10 @@ def upgrade_config(correction: dict | None = None) -> dict:
     """
     cfg = load_config()
     migrate_claude_block(cfg)
-    for key in ("punctuation", "opencc_keep", "correction", "minutes") + V2_BLOCKS:
+    for key in ("punctuation", "opencc_keep", "correction", "minutes") + V2_BLOCKS + V21_BLOCKS:
         if key not in cfg:
             cfg[key] = copy.deepcopy(DEFAULTS[key])
-        elif key in V2_DEEP_FILL and isinstance(cfg[key], dict):
+        elif key in V2_DEEP_FILL + V21_BLOCKS and isinstance(cfg[key], dict):
             _fill_missing(cfg[key], DEFAULTS[key])
     if correction:
         if not isinstance(cfg.get("correction"), dict):
@@ -361,6 +373,22 @@ def upgrade_config(correction: dict | None = None) -> dict:
     config_path().parent.mkdir(parents=True, exist_ok=True)
     config_path().write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
     return cfg
+
+
+def html_setting(cfg: dict, key: str, warn=None):
+    """〔2.1.0〕讀 html.<key>（enabled／media／theme；規格 §6.1）。不認得的值當成預設值，並印一行提示（warn 預設印到 stderr）。"""
+    default = DEFAULTS["html"][key]
+    v = setting(cfg, "html." + key)
+    ok = isinstance(v, bool) if key == "enabled" else (isinstance(v, str) and v in HTML_CHOICES[key])
+    if ok:
+        return v
+    shown = json.dumps(default) if isinstance(default, bool) else default
+    msg = f"[!] html.{key} 的值 {v} 不認得，改用 {shown}"
+    if warn is None:
+        print(msg, file=sys.stderr, flush=True)
+    else:
+        warn(msg)
+    return default
 
 
 def added_config_keys(before: dict, after: dict, prefix: str = "") -> list:

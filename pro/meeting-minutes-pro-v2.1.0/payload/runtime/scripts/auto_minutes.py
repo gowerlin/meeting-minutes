@@ -22,11 +22,14 @@
 - 〔2.0.0〕會議在整理（分段時為彙整）後再補判一次：程式比對保留說法清單與彙整後的待釐清問題，附近沒有
   待釐清問題的保留說法連同前後幾段逐字稿交模型判斷（SYSTEM_RECHECK，呼叫 1 次），只收補列的問題（recheck_targets()、
   apply_recheck()；auto_minutes.json 的 recheck）。單段整理也用；附近都已有待釐清問題時不呼叫。
+- 〔2.1.0〕網頁版（規格 2.1.0 §2.2）：.md 寫入成功（ok／partial）後呼叫 render_html.render() 產生 meeting-minutes.html／notes.html
+  （html.enabled，預設開；--no-html 本次不產生）；--render-only 寫完 notes.md 後同樣產生。網頁版失敗只印一行提示、記 log，
+  .md、status、reason、exit code 都不變。結果寫進 stdout 的 minutes.html 與 auto_minutes.json 的 html。
 
 單獨執行：
   python auto_minutes.py <檔名>_minutes [--claude | --openai] [--minutes-provider auto|claude|openai]
                          [--minutes-model M] [--minutes-effort E] [--minutes-channel cli|api]
-                         [--source auto|corrected|original] [--force]
+                         [--source auto|corrected|original] [--force] [--no-html]
                          [--type T] [--template X] [--render-only]
 exit code：0 ok／partial、2 skipped（找不到 CLI、沒有金鑰、已有會議記錄、參數矛盾）、3 登入失敗、4 模型不存在、5 其他失敗。
 """
@@ -41,11 +44,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import auto_correct as ac  # noqa: E402
 import content_types as ctypes  # noqa: E402
 import diarize as diar  # noqa: E402  只用講者發言時間的格式（不載入分離模型）
+import render_html  # noqa: E402  〔2.1.0〕網頁版（不呼叫模型、只用標準函式庫）
 import runlog  # noqa: E402
 from auto_correct import (CHANNEL_NAME, EFFORTS, MESSAGES, PROVIDER_NAME, RETRY_ONCE, VENDOR,  # noqa: E402
                           OptionError, _fail, call, call_context, content_of, exit_code, fmt_span, log,
                           resolve_request, select_backend)
-from common import VERSION, load_config, print_banner, setting, utf8_console  # noqa: E402
+from common import VERSION, html_setting, load_config, print_banner, setting, utf8_console  # noqa: E402
 
 PROMPT = ac.PROMPT
 HEAD_RE = re.compile(r"^\*\*\[(\d{1,2}:\d{2}:\d{2})\] ([^*\n]+?)\*\*：")
@@ -995,11 +999,12 @@ def _message(reason, be: dict | None) -> str | None:
 
 # ---------------------------------------------------------------- 主流程
 def run(out_dir, req: dict | None = None, force: bool = False, source: str = "auto", cfg: dict | None = None,
-        run_log=None, content_type: str | None = None, template: str | None = None) -> dict:
+        run_log=None, content_type: str | None = None, template: str | None = None, html: bool | None = None) -> dict:
     """產出 meeting-minutes.md（會議）或 notes.md＋notes.json（其他類型）。不丟例外。回傳 {"status": ok|partial|skipped|failed,
     "reason", "provider", "channel", "model", "minutes_md", "parts", "parts_ok", "source_file", "message", "fallback",
     "content_type", "template", "output"}。
-    〔2.0.0〕content_type／template：None＝沿用 transcript.json 的 meta.content_type／meta.template（沒有就 meeting、不用範本）。"""
+    〔2.0.0〕content_type／template：None＝沿用 transcript.json 的 meta.content_type／meta.template（沒有就 meeting、不用範本）。
+    〔2.1.0〕html：None＝依 html.enabled；False＝本次不產生網頁版（--no-html）。結果在回傳值的 "html"（§2.2）。"""
     out_dir = Path(out_dir)
     rl = run_log
     if rl is None:
@@ -1009,7 +1014,7 @@ def run(out_dir, req: dict | None = None, force: bool = False, source: str = "au
     ac.CALL_LOG, rl.step = rl, "minutes"
     t_start, w0 = runlog.now(), time.perf_counter()
     try:
-        return _run(out_dir, req, force, source, cfg, rl, content_type, template)
+        return _run(out_dir, req, force, source, cfg, rl, content_type, template, html)
     finally:
         rl.event("checkpoint", name="minutes", started_at=runlog.iso(t_start), ended_at=runlog.iso(runlog.now()),
                  duration_sec=round(time.perf_counter() - w0, 3))
@@ -1087,13 +1092,40 @@ def _backup(path: Path, stamp: str) -> Path | None:
     return bak
 
 
-def _run(out_dir: Path, req, force, source, cfg, rl, content_type=None, template=None) -> dict:
+HTML_KEYS = ("status", "reason", "output", "media")              # 〔2.1.0〕stdout 的 minutes.html
+HTML_RECORD_KEYS = HTML_KEYS + ("timecodes",)                   # 〔2.1.0〕auto_minutes.json 的 html
+
+
+def html_skipped(reason: str = "no_md") -> dict:
+    """〔2.1.0〕沒有產生網頁版時的結果（reason：disabled＝設定關或 --no-html；no_md＝這次沒有寫 .md）。"""
+    return {"status": "skipped", "reason": reason, "output": None, "media": None, "timecodes": None}
+
+
+def make_html(out_dir: Path, md_name: str, cfg: dict, rl, html: bool | None) -> dict:
+    """〔2.1.0〕.md 寫入成功後產生網頁版（規格 §2.2）。不丟例外；失敗時 console 印一行提示，不影響 .md 與 exit code。"""
+    try:
+        enabled = html_setting(cfg, "enabled") if html is None else bool(html)
+        if not enabled:
+            return html_skipped("disabled")
+        r = render_html.render(out_dir, md_name, cfg=cfg, run_log=rl)
+    except Exception as ex:  # noqa: BLE001  render() 本身不丟例外；保險
+        r = {"status": "failed", "reason": "internal_error", "output": None, "media": None, "timecodes": None,
+             "error": type(ex).__name__}
+    if r.get("status") == "ok":
+        log(f"  網頁版：{r['output']}" + ("（時間碼可點播放原始媒體）" if r.get("media") in ("found", "explicit")
+                                         else "（時間碼為文字）"))
+    else:
+        log(f"  [!] 網頁版未產生（{r.get('reason')}）；{md_name} 不受影響，可執行 render_html.py 補做")
+    return r
+
+
+def _run(out_dir: Path, req, force, source, cfg, rl, content_type=None, template=None, html=None) -> dict:
     started = runlog.now()
     t0 = time.time()
     cfg = load_config() if cfg is None else cfg
     res = {"status": "failed", "reason": None, "provider": None, "channel": None, "model": None, "minutes_md": None,
            "parts": 0, "parts_ok": 0, "source_file": None, "message": None, "fallback": None,
-           "content_type": None, "template": None, "output": None}
+           "content_type": None, "template": None, "output": None, "html": html_skipped()}
     rec = {"version": VERSION, "started_at": runlog.iso(started), "api_tested": False}
     refilled = []
 
@@ -1101,7 +1133,8 @@ def _run(out_dir: Path, req, force, source, cfg, rl, content_type=None, template
         res.update(status=status, reason=reason, message=message, **extra)
         rec.update(status=status, reason=reason, elapsed_sec=round(time.time() - t0, 1), provider=res["provider"],
                    channel=res["channel"], source_file=res["source_file"], content_type=res["content_type"],
-                   template=res["template"], output=res["output"])
+                   template=res["template"], output=res["output"],
+                   html={k: (res.get("html") or {}).get(k) for k in HTML_RECORD_KEYS})
         if message:
             log(f"  [!] {message}")
         rl.event("result", status=status, reason=reason, provider=res["provider"], model=res["model"],
@@ -1333,6 +1366,7 @@ def _run(out_dir: Path, req, force, source, cfg, rl, content_type=None, template
         else:
             log(f"  完成：{NOTES_MD}、{NOTES_JSON}（待釐清 {t.get('questions', 0)}" + unfinished + "）")
         res["minutes_md"] = str(out_md)
+        res["html"] = make_html(out_dir, out_md.name, cfg, rl, html)       # 〔2.1.0〕網頁版（失敗不影響 status）
         msg = None
         if len(results) < len(parts):
             msg = (f"有 {len(parts) - len(results)} 段未能自動整理（{reason}），{out_md.name} 開頭有標示；"
@@ -1346,9 +1380,10 @@ def _run(out_dir: Path, req, force, source, cfg, rl, content_type=None, template
         return finish("failed", "internal_error", f"會議摘要發生未預期的錯誤：{type(ex).__name__}: {str(ex)[:160]}")
 
 
-def render_only(out_dir) -> dict:
+def render_only(out_dir, cfg: dict | None = None, html: bool | None = None) -> dict:
     """〔2.0.0〕--render-only（規格 §6.2）：從 notes.json 重新產生 notes.md，不呼叫模型。回傳 {"status", "reason", "message",
-    "content_type", "output"}；會議類型不支援（skipped render_meeting）。"""
+    "content_type", "output", "html"}；會議類型不支援（skipped render_meeting）。
+    〔2.1.0〕寫完 notes.md 後接著產生 notes.html（同一個開關：html.enabled／--no-html）。"""
     out_dir = Path(out_dir)
     p = out_dir / NOTES_JSON
     try:
@@ -1359,16 +1394,21 @@ def render_only(out_dir) -> dict:
             raise KeyError(code)
     except FileNotFoundError:
         return {"status": "skipped", "reason": "no_notes_json", "message": MSG["no_notes_json"], "content_type": None,
-                "output": None}
+                "output": None, "html": html_skipped()}
     except Exception:  # noqa: BLE001
         return {"status": "skipped", "reason": "no_notes_json", "message": MSG["no_notes_json"], "content_type": None,
-                "output": None}
+                "output": None, "html": html_skipped()}
     if code == "requirements":
         number_requirements(data)
     text = render_notes(code, data, _read_meta(out_dir), out_dir, r)
     (out_dir / NOTES_MD).write_text(text, encoding="utf-8", newline="\n")
     log(f"  已從 {NOTES_JSON} 重新產生 {NOTES_MD}")
-    return {"status": "ok", "reason": None, "message": None, "content_type": code, "output": NOTES_MD}
+    cfg = load_config() if cfg is None else cfg
+    rl = runlog.RunLog(out_dir, step="minutes")
+    h = make_html(out_dir, NOTES_MD, cfg, rl, html)
+    if rl.owns:
+        rl.finish()
+    return {"status": "ok", "reason": None, "message": None, "content_type": code, "output": NOTES_MD, "html": h}
 
 
 def _chars(paras: list) -> int:
@@ -1440,20 +1480,23 @@ def main():
     ap.add_argument("--template", default=None, help="自訂範本代號（$MMH/templates/<代號>.md；預設 meta.template）")
     ap.add_argument("--render-only", action="store_true",
                     help="不呼叫模型，從 notes.json 重新產生 notes.md（非會議類型；在對話中改過 notes.json 之後用）")
+    ap.add_argument("--no-html", action="store_true", help="〔2.1.0〕本次不產生網頁版（meeting-minutes.html／notes.html）")
     args = ap.parse_args()
+    html = False if args.no_html else None
     if args.render_only:
         meta = _read_meta(Path(args.out_dir))
         code = args.content_type or meta.get("content_type") or ctypes.DEFAULT_TYPE
         if code == "meeting":
             r = {"status": "skipped", "reason": "render_meeting", "message": MSG["render_meeting"], "content_type": code,
-                 "output": None}
+                 "output": None, "html": html_skipped()}
         else:
-            r = render_only(args.out_dir)
+            r = render_only(args.out_dir, html=html)
         if r["message"]:
             log(f"[!] {r['message']}")
         print(json.dumps({"minutes": {"status": r["status"], "reason": r["reason"], "content_type": r["content_type"],
                                       "output": r["output"],
-                                      "minutes_md": str(Path(args.out_dir) / NOTES_MD) if r["output"] else None}},
+                                      "minutes_md": str(Path(args.out_dir) / NOTES_MD) if r["output"] else None,
+                                      "html": {k: (r.get("html") or {}).get(k) for k in HTML_KEYS}}},
                          ensure_ascii=False))
         sys.exit(0 if r["status"] == "ok" else 2)
     cfg = load_config()
@@ -1464,11 +1507,11 @@ def main():
         log(f"[!] {ex}")
         sys.exit(2)
     res = run(args.out_dir, req, force=args.force, source=args.source, cfg=cfg, content_type=args.content_type,
-              template=args.template)
-    print(json.dumps({"minutes": {k: res[k] for k in ("status", "reason", "provider", "model", "channel", "parts",
-                                                      "parts_ok", "minutes_md", "source_file", "fallback",
-                                                      "content_type", "template", "output")}},
-                     ensure_ascii=False))
+              template=args.template, html=html)
+    out = {k: res[k] for k in ("status", "reason", "provider", "model", "channel", "parts", "parts_ok", "minutes_md",
+                               "source_file", "fallback", "content_type", "template", "output")}
+    out["html"] = {k: (res.get("html") or {}).get(k) for k in HTML_KEYS}        # 〔2.1.0〕
+    print(json.dumps({"minutes": out}, ensure_ascii=False))
     sys.exit(exit_code(res))
 
 

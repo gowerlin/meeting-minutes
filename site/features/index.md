@@ -1,6 +1,6 @@
 ---
 title: 功能總覽
-description: meeting-minutes-pro 的功能一覽：本機轉寫、說話者分離、內容類型、自訂範本、字幕、AI 校正與會議摘要、對照表、執行 log。
+description: meeting-minutes-pro 的功能一覽：本機轉寫、說話者分離、內容類型、自訂範本、字幕、網頁版、AI 校正與會議摘要、對照表、執行 log。
 ---
 
 # 功能總覽
@@ -34,6 +34,7 @@ description: meeting-minutes-pro 的功能一覽：本機轉寫、說話者分�
 | [會議摘要](/features/ai-correction#會議摘要) | 整理出摘要、議題、決議、待辦、待釐清問題，每一項附時間碼 |
 | [7 種內容類型](/features/content-types) | 會議以外，課程、訪談節目、操作教學、座談、工作坊、需求訪談各自整理成合適的筆記 |
 | [自訂範本](/features/custom-templates) | 延伸內建類型，例如改節標題、補一段「整理重點」 |
+| [網頁版](/features/web) | 整理完同時產生 `.html`：左側目錄、深淺主題、時間碼點了播放原始錄音；單一檔、完全離線，由本機程式轉換、不呼叫模型 |
 
 ## 記錄與管理
 
@@ -44,4 +45,4 @@ description: meeting-minutes-pro 的功能一覽：本機轉寫、說話者分�
 
 ## 和基本版相比
 
-Pro 版多了：固定錯誤對照表、校正版逐字稿、Breeze-ASR-25、本機分段標點、OpenCC 詞彙回復表、自動 AI 校正、自動會議摘要、執行 log、7 種內容類型、自訂範本、字幕、說話者分離改進（含 GPU 選項）。差異表見[基本版](/basic#和-pro-版的差異)。
+Pro 版多了：固定錯誤對照表、校正版逐字稿、Breeze-ASR-25、本機分段標點、OpenCC 詞彙回復表、自動 AI 校正、自動會議摘要、執行 log、7 種內容類型、自訂範本、字幕、網頁版、說話者分離改進（含 GPU 選項）。差異表見[基本版](/basic#和-pro-版的差異)。

@@ -16,7 +16,7 @@
 - `<目錄前綴><版號>-installer.zip`：版本目錄裡 `git ls-files` 列出的檔案，根目錄 `<目錄前綴><版號>/`；
   `.sh`／`.command` 權限 755，其餘 644；不含 `tests/`、`_out/`、`__pycache__`。內容取自工作目錄。
 - `<目錄前綴><版號>-claude-app-upload.zip`：payload 裡的上傳用 zip 原檔複製
-  （只有 skill 的 `SKILL.md`＋`references/`，不含任何 zip），給 Claude App 直接上傳。
+  （只有 skill 的 `SKILL.md`＋`references/`；〔2.1.0〕起另有 `scripts/` 兩檔；不含任何 zip），給 Claude App 直接上傳。
 - 兩個 zip 各一個 `.sha256`（`<hex>  <檔名>`），以及 `README.txt`（兩個檔的用途）。
 
 目錄前綴：Pro `meeting-minutes-pro-v`、基本版 `meeting-minutes-v`。發行檔名例：
@@ -28,6 +28,15 @@
 
 另查模型權重（2.0.0 起，規格 §9.5）：版本目錄內（不論有沒有被 git 追蹤）只要有 `pytorch_model.bin` 或 `*.npz`
 （pyannote 權重的檔名）就報錯停止、exit 2。權重由使用者自己同意 Hugging Face 條件後下載，不得放進安裝包（規格 §8.7）。
+
+〔2.1.0〕網頁版（規格 2.1.0 §6.6、§7.4、H-13）：runtime 有 `payload/runtime/scripts/render_html.py` 的 Pro 版本目錄另查
+① `render_html.py` 的 `FALLBACK_VERSION` 等於 `common.py` 的 `VERSION`；② skill 內的 `scripts/render_html.py`、
+`scripts/html_template.html` 與 runtime 的同名檔逐位元相同（Claude App 沙盒用的就是 skill 內這兩檔）。不符合就 exit 2。
+skill 內這兩檔由打包複製，不手改：
+
+    python .../tools/make_dist.py meeting-minutes-pro-v2.1.0 --sync-skill   # 複製兩檔到 skill/scripts/、重產 payload zip
+
+`--sync-skill` 只更新版本目錄（不產生 dist/）；之後 `git add` 新檔再執行一次（不加 `--sync-skill`）產生發行檔。
 
 只用 Python 標準函式庫；Windows／macOS 皆可執行，需要 `git` 指令。
 """
@@ -55,6 +64,9 @@ WEIGHT_NAMES = ("pytorch_model.bin",)
 WEIGHT_SUFFIXES = (".npz",)
 
 VERSION_RE = re.compile(r'^VERSION\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+FALLBACK_VERSION_RE = re.compile(r'^FALLBACK_VERSION\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+# 〔2.1.0〕skill 內由打包從 runtime 複製的檔（規格 2.1.0 §7.4；Claude App 沙盒執行 render_html.py 用）
+SKILL_SCRIPT_FILES = ("render_html.py", "html_template.html")
 # (相對路徑, 版號樣式, 說明)：兩個產品共用
 OTHER_VERSIONS = (
     ("install.ps1", re.compile(r'^\$Version\s*=\s*"([^"]+)"', re.MULTILINE), "install.ps1 $Version"),
@@ -226,6 +238,80 @@ def check_no_weights(version_dir: Path) -> None:
         raise DistError("版本目錄內有模型權重檔（不得放進安裝包，請移走）：\n  - " + "\n  - ".join(found))
 
 
+def runtime_scripts(version_dir: Path) -> Path:
+    return version_dir / "payload" / "runtime" / "scripts"
+
+
+def has_html(version_dir: Path, product: Product = PRO) -> bool:
+    """〔2.1.0〕這個版本目錄有網頁版（runtime 有 render_html.py）；基本版與 2.0.x 以前沒有。"""
+    return product.key == PRO.key and (runtime_scripts(version_dir) / SKILL_SCRIPT_FILES[0]).is_file()
+
+
+def check_skill_scripts(version_dir: Path, product: Product = PRO) -> list[str]:
+    """〔2.1.0〕H-13：FALLBACK_VERSION＝common.VERSION；skill 內的 scripts/ 兩檔與 runtime 逐位元相同。
+    沒有網頁版的版本目錄回傳 []（不查）；有就回傳檢查過的檔名。"""
+    if not has_html(version_dir, product):
+        return []
+    rt = runtime_scripts(version_dir)
+    errors = []
+    m = VERSION_RE.search((rt / "common.py").read_text(encoding="utf-8")) if (rt / "common.py").is_file() else None
+    fb = FALLBACK_VERSION_RE.search((rt / "render_html.py").read_text(encoding="utf-8"))
+    if not fb:
+        errors.append("render_html.py 沒有 FALLBACK_VERSION = \"…\"")
+    elif not m or fb.group(1) != m.group(1):
+        errors.append(f"render_html.py FALLBACK_VERSION {fb.group(1)} ≠ common.py VERSION {m.group(1) if m else '（讀不到）'}")
+    skill_scripts = version_dir / product.skill_dir / "scripts"
+    for name in SKILL_SCRIPT_FILES:
+        src, dst = rt / name, skill_scripts / name
+        if not src.is_file():
+            errors.append(f"runtime 沒有 {name}")
+        elif not dst.is_file():
+            errors.append(f"skill 內沒有 scripts/{name}（執行 make_dist.py --sync-skill 從 runtime 複製）")
+        elif src.read_bytes() != dst.read_bytes():
+            errors.append(f"skill 內的 scripts/{name} 和 runtime 的不是逐位元相同（執行 make_dist.py --sync-skill 重新複製）")
+    if errors:
+        raise DistError("網頁版檔案檢查（H-13）失敗：\n  - " + "\n  - ".join(errors))
+    return list(SKILL_SCRIPT_FILES)
+
+
+def build_upload_zip(skill_dir: Path, dest: Path, upload_root: str = UPLOAD_ROOT) -> list[str]:
+    """payload 的上傳用 zip：skill 目錄的所有檔（不含 __pycache__、zip），依路徑排序，根目錄 upload_root。"""
+    files = sorted(p for p in skill_dir.rglob("*")
+                   if p.is_file() and "__pycache__" not in p.parts and not p.name.lower().endswith(".zip"))
+    names = []
+    fd, tmp = tempfile.mkstemp(dir=str(dest.parent), prefix=".tmp-", suffix=".zip")
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for p in files:
+                rel = p.relative_to(skill_dir).as_posix()
+                mtime = time.localtime(max(p.stat().st_mtime, 315532800))
+                info = zipfile.ZipInfo(upload_root + rel, date_time=mtime[:6])
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = (0o100000 | 0o644) << 16
+                zf.writestr(info, p.read_bytes())
+                names.append(upload_root + rel)
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return names
+
+
+def sync_skill(version_dir: Path, product: Product = PRO) -> list[str]:
+    """〔2.1.0〕`--sync-skill`：runtime 的 render_html.py、html_template.html 複製到 skill/scripts/，重產 payload zip。"""
+    if not has_html(version_dir, product):
+        raise DistError(f"{version_dir.name} 沒有網頁版（runtime 沒有 render_html.py），不需要 --sync-skill")
+    skill_dir = version_dir / product.skill_dir
+    (skill_dir / "scripts").mkdir(exist_ok=True)
+    for name in SKILL_SCRIPT_FILES:
+        shutil.copyfile(runtime_scripts(version_dir) / name, skill_dir / "scripts" / name)
+    names = build_upload_zip(skill_dir, version_dir / product.payload_zip, product.upload_root)
+    check_skill_scripts(version_dir, product)
+    check_upload_zip(version_dir / product.payload_zip, skill_dir, product.upload_root)
+    return names
+
+
 def check_upload_zip(upload_zip: Path, skill_dir: Path, upload_root: str = UPLOAD_ROOT) -> list[str]:
     if not upload_zip.is_file():
         raise DistError(f"找不到 {upload_zip}")
@@ -327,13 +413,29 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--product", choices=sorted(PRODUCTS), default=PRO.key,
                     help="pro（預設）或 basic（基本版）")
     ap.add_argument("--out-dir", help="輸出資料夾（預設：<產品目錄>/dist）")
+    ap.add_argument("--sync-skill", action="store_true",
+                    help="〔2.1.0〕把 runtime 的 render_html.py、html_template.html 複製到 skill/scripts/ 並重產 payload zip"
+                         "（只更新版本目錄，不產生 dist/）")
     args = ap.parse_args(argv)
     product = PRODUCTS[args.product]
+
+    if args.sync_skill:
+        try:
+            version_dir = find_version_dir(args.version_dir, product)
+            names = sync_skill(version_dir, product)
+        except DistError as exc:
+            print(f"錯誤：{exc}", file=sys.stderr)
+            return 2
+        print(f"已複製 {', '.join(SKILL_SCRIPT_FILES)} 到 {product.skill_dir}/scripts/（與 runtime 逐位元相同）")
+        print(f"已重產 {product.payload_zip}：{len(names)} 項")
+        print("新檔請先 git add，再執行一次 make_dist.py（不加 --sync-skill）產生發行檔")
+        return 0
 
     try:
         version_dir = find_version_dir(args.version_dir, product)
         version = read_version(version_dir, product)
         check_no_weights(version_dir)
+        html_checked = check_skill_scripts(version_dir, product)
         files = tracked_files(version_dir)
         upload_src = version_dir / product.payload_zip
         upload_names = check_upload_zip(upload_src, version_dir / product.skill_dir, product.upload_root)
@@ -367,6 +469,9 @@ def main(argv: list[str] | None = None) -> int:
                  readme_text(version, installer_name, upload_name, product).encode("utf-8-sig"))
 
     print(f"{product.name} 版號 {version}（common.py、SKILL.md、install.ps1、install.sh、README、目錄名稱一致）；模型權重檔 0 個")
+    if html_checked:
+        print(f"網頁版（H-13）：render_html.py FALLBACK_VERSION＝common.py VERSION；skill 內 scripts/ 的 "
+              f"{'、'.join(html_checked)} 與 runtime 逐位元相同")
     print(f"{installer_name}：{len(files)} 檔，{installer.stat().st_size:,} bytes，sha256 {sha256_of(installer)}")
     print(f"{upload_name}：{len(upload_names)} 項（無巢狀 zip），{upload.stat().st_size:,} bytes，sha256 {sha256_of(upload)}")
     print(f"README.txt 與 .sha256 已寫入 {dist_dir}")
