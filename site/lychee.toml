@@ -1,0 +1,17 @@
+# 外部連結與靜態資源檢查設定（沿用 Control Tower Portal 的 lychee.toml）。外部連結失敗只警告，不擋部署。
+#
+# dist 的站內連結是 /meeting-minutes/<頁面>（base + cleanUrls，沒有 .html）。workflow 把 build 產物解到
+# _lychee/meeting-minutes/，再以 --root-dir <絕對路徑>/_lychee 執行；root_dir 必須是絕對路徑，所以放在指令列，不寫在這裡。
+
+# cleanUrls：/faq → faq.html；/install/ → install/index.html
+fallback_extensions = ["html"]
+index_files = ["index.html"]
+
+# GitHub 連結偶爾回 429（速率限制）；429 仍不算死連結
+accept = ["200..=299", "429"]
+max_retries = 3
+retry_wait_time = 2
+timeout = 20
+max_concurrency = 16
+
+exclude_loopback = true

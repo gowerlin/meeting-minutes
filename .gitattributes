@@ -1,0 +1,4 @@
+# macOS 與 Linux 執行的腳本固定 LF：Windows 上 core.autocrlf=true 時 checkout 成 CRLF 會讓腳本無法執行。
+# 其餘檔案照來源原樣
+*.sh text eol=lf
+*.command text eol=lf

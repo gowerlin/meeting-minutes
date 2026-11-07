@@ -1,0 +1,4 @@
+# 依賴與建置產物，不進版控
+node_modules/
+.vitepress/cache/
+.vitepress/dist/

@@ -1,0 +1,5 @@
+# meeting-minutes-pro：自動校正的 API 通道（選用；correction.channel = api 時才需要）
+# 安裝："$PY" -m pip install -r "$MMH/requirements-api.txt"
+# 下限＝1.1.0 實作時驗證過參數的版本（messages.stream output_config、responses.stream reasoning／text）
+anthropic>=2.6
+openai>=3.46

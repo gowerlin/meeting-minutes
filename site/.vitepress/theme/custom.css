@@ -1,0 +1,132 @@
+/* 配色：墨綠＋琥珀（不沿用 Control Tower Portal 的配色） */
+:root {
+  --vp-c-brand-1: #0f6b66;
+  --vp-c-brand-2: #12807a;
+  --vp-c-brand-3: #0f6b66;
+  --vp-c-brand-soft: rgba(15, 107, 102, 0.12);
+  --mm-amber: #b86a12;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #0f6b66 20%, #c8781a);
+}
+
+.dark {
+  --vp-c-brand-1: #5cc8bf;
+  --vp-c-brand-2: #47b3aa;
+  --vp-c-brand-3: #2f9a91;
+  --vp-c-brand-soft: rgba(92, 200, 191, 0.16);
+  --mm-amber: #f2b45f;
+  --vp-home-hero-name-background: linear-gradient(120deg, #5cc8bf 20%, #f2b45f);
+}
+
+/* 下載區 */
+.mm-download {
+  margin: 24px 0;
+  padding: 20px 24px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+}
+.mm-download-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 16px;
+}
+.mm-download-ver {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+.mm-download-date {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+}
+.mm-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.mm-btn {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none !important;
+  border: 1px solid var(--vp-c-brand-1);
+}
+.mm-btn.brand {
+  background: var(--vp-c-brand-1);
+  color: #fff !important;
+}
+.dark .mm-btn.brand {
+  color: #0b1f1f !important;
+}
+.mm-btn.alt {
+  color: var(--vp-c-brand-1) !important;
+}
+.mm-download-table {
+  margin-top: 16px !important;
+  font-size: 14px;
+}
+.mm-sha {
+  word-break: break-all;
+  font-size: 12px !important;
+}
+
+/* 步驟條 */
+.mm-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 0 !important;
+  margin: 20px 0 !important;
+}
+.mm-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 !important;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  border-top: 3px solid var(--vp-c-brand-1);
+}
+.mm-step-no {
+  font-weight: 700;
+  color: var(--mm-amber);
+  font-size: 18px;
+}
+.mm-step-title {
+  font-weight: 600;
+}
+.mm-step-text {
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+  line-height: 1.6;
+}
+
+.mm-version {
+  font-weight: 600;
+}
+
+/* 首頁 hero 與功能卡以下的內文區 */
+.mm-home {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 8px 24px 48px;
+}
+@media (min-width: 640px) {
+  .mm-home {
+    padding: 8px 48px 64px;
+  }
+}
+.mm-home h2 {
+  margin: 40px 0 12px;
+  font-size: 22px;
+  font-weight: 600;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 24px;
+}

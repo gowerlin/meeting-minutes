@@ -1,0 +1,7 @@
+# 專有名詞清單：一行一個，會當作 Whisper hotwords 提升辨識正確率
+# 依你的專案自行增刪；以 # 開頭為註解
+# 下面是示範用的通用技術詞，請換成你自己會議裡的公司名、人名、產品與系統名稱
+Kubernetes
+PostgreSQL
+Redis
+API

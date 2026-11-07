@@ -1,0 +1,6 @@
+openvino-genai>=2026.1
+sherpa-onnx>=1.12
+soundfile
+numpy
+opencc-python-reimplemented
+huggingface_hub<3

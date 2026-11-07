@@ -1,0 +1,140 @@
+name: Pages
+
+# meeting-minutes Portal 的 GitHub Pages 部署（VitePress，原始碼在 site/；站點網址 https://<owner>.github.io/meeting-minutes/）
+# repo 啟用 Pages（Settings → Pages → Source: GitHub Actions）之前，build 與連結檢查照跑，deploy 跳過；
+# 啟用後重新執行這個 workflow（Actions → Pages → Run workflow）就會部署。
+on:
+  push:
+    branches: [main]
+    # 只改程式碼時不重新建站
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'pro/*/README.md'
+      - 'basic/*/README.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: site
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      pages-enabled: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+        env:
+          PORTAL_BASE: /meeting-minutes/
+          # 網址由 repo 擁有者組出，不在檔案裡寫帳號名
+          PORTAL_SITE_URL: https://${{ github.repository_owner }}.github.io/meeting-minutes/
+
+      # 去識別掃描：私有詞表不在 repo 裡。repo 設了 MM_DEID_TERMS／MM_DEID_ALLOW 兩個 secret（檔案內容）時才掃，
+      # 沒設就略過（本機發布前一律另外掃）。只印「檔案:行:類別」，不印命中原文
+      - name: De-identification scan (optional)
+        env:
+          TERMS: ${{ secrets.MM_DEID_TERMS }}
+          ALLOW: ${{ secrets.MM_DEID_ALLOW }}
+        run: |
+          if [ -z "$TERMS" ] || [ -z "$ALLOW" ]; then
+            echo "::notice title=De-identification scan skipped::MM_DEID_TERMS / MM_DEID_ALLOW secrets are not set"
+            exit 0
+          fi
+          printf '%s\n' "$TERMS" > "$RUNNER_TEMP/terms.txt"
+          printf '%s\n' "$ALLOW" > "$RUNNER_TEMP/allow.txt"
+          MM_DEID_TERMS="$RUNNER_TEMP/terms.txt" MM_DEID_ALLOW="$RUNNER_TEMP/allow.txt" npm run deid:repo
+
+      # Pages 還沒啟用時 GET /repos/{owner}/{repo}/pages 回 404：不設定 Pages、不部署，workflow 不變紅
+      - id: pages
+        name: Check whether Pages is enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" --silent; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Pages not enabled::Settings → Pages → Source: GitHub Actions，啟用後重新執行這個 workflow"
+          fi
+
+      - if: steps.pages.outputs.enabled == 'true'
+        uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages-enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  # 死連結檢查（lychee）：只警告、不擋部署，所以不在 deploy 的 needs 裡，失敗也不讓 workflow 變紅。
+  # 站內死連結在 build 時已由 VitePress 擋下；這裡多抓的是外部連結與靜態資源。設定在 site/lychee.toml。
+  link-check:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/pages
+
+      # 站內連結是 /meeting-minutes/<頁面>，所以把 dist 放到同名子目錄、以上一層當 --root-dir
+      - name: Unpack site
+        run: |
+          mkdir -p _lychee/meeting-minutes
+          tar -xf "$RUNNER_TEMP/pages/artifact.tar" -C _lychee/meeting-minutes
+
+      - id: lychee
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: >-
+            --config site/lychee.toml
+            --root-dir ${{ github.workspace }}/_lychee
+            --no-progress
+            '_lychee/meeting-minutes/**/*.html'
+          fail: false
+          failIfEmpty: false
+
+      - name: Warn on broken links
+        if: steps.lychee.outputs.exit_code != '0'
+        run: echo "::warning title=Broken links::lychee exit code ${{ steps.lychee.outputs.exit_code }}; see the job summary for the list."

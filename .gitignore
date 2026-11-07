@@ -1,0 +1,9 @@
+# 打包產物、測試輸出、本機產物與網站建置，不進版控
+dist/
+pro/tests/_out/
+__pycache__/
+*.pyc
+node_modules/
+site/.vitepress/cache/
+site/.vitepress/dist/
+.sonar/

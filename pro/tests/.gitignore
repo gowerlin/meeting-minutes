@@ -1,0 +1,6 @@
+_out/
+__pycache__/
+*.wav
+*.mp3
+*.onnx
+*.tar.bz2

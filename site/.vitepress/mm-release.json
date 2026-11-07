@@ -1,0 +1,17 @@
+{
+  "proVersion": "2.0.2",
+  "proTag": "pro-v2.0.2",
+  "basicVersion": "1.0.1",
+  "basicTag": "basic-v1.0.1",
+  "releasedAt": "2026-11-07",
+  "assets": {
+    "pro": [
+      { "name": "meeting-minutes-pro-v2.0.2-installer.zip", "sha256": "40cac388782a281f6f243fb5c95e7b6dff6d3298484a1e078fbb6215273580f4" },
+      { "name": "meeting-minutes-pro-v2.0.2-claude-app-upload.zip", "sha256": "0ea8bbaf0086e25b0fe2736ee4fbba7d865de838fbc42df7ccb1a0d03fab26d3" }
+    ],
+    "basic": [
+      { "name": "meeting-minutes-v1.0.1-installer.zip", "sha256": "a26bdb0d68fea9ccf3d0c700caf211d5ea5d0f742b0c18cb031a07decbc9ef2b" },
+      { "name": "meeting-minutes-v1.0.1-claude-app-upload.zip", "sha256": "340eb721a43317dc44a36117b3774f03fa6127a1ed3f04ff71bf2ba9089602cd" }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+# GPU speaker diarization (optional, NVIDIA only): installed into $MMH/venv-gpu-diar by install.ps1 (spec 2.0.0 section 8.2)
+# torch/torchaudio are pinned first from the cu128 index; this file is installed with -c constraints-gpu-diar.txt
+pyannote.audio==4.0.7
+# upper bound (2.0.0): 2.4.0 is the tested version; the `hf auth login` screens quoted in setup_gpu_diar.py and README
+# depend on the huggingface_hub version -- when raising this bound, re-check those guide texts
+huggingface_hub>=0.30,<3

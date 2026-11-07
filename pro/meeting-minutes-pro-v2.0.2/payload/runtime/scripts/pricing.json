@@ -1,0 +1,21 @@
+{
+  "_comment": "meeting-minutes-pro 價格表：計算執行 log（run_log.jsonl、logs/runs.jsonl）的 API 等價費用。每百萬 token 的美元價格。要更新：改這個檔（隨安裝程式更新），或在 runtime 根目錄放 pricing.json，同名項目會蓋過這裡的值。訂閱通道（claude -p、codex exec）不另計費，log 標「等價估算，不另計費」。",
+  "updated": "2026-11-06",
+  "currency": "USD",
+  "unit": "per_1m_tokens",
+  "sources": [
+    {"provider": "claude", "what": "輸入、輸出、快取讀取", "source": "Anthropic 官方價格（Claude Code 內建 claude-api skill 的模型表，快取日期 2026-10-06）", "checked": "2026-11-06"},
+    {"provider": "claude", "what": "快取寫入（5 分鐘 TTL 1.25 倍、1 小時 TTL 2 倍輸入價）", "source": "Anthropic 價格文件〔文件〕", "checked": "2026-11-06"},
+    {"provider": "openai", "what": "輸入、快取輸入、輸出（Standard、≤272K context）", "source": "OpenAI 價格文件〔文件〕", "checked": "2026-11-06"}
+  ],
+  "models": {
+    "claude:opus":   {"ids": ["opus", "claude-opus-5-5"],     "input": 4.0, "output": 20.0, "cache_read": 0.20, "cache_write_5m": 5.0,   "cache_write_1h": 8.0},
+    "claude:sonnet": {"ids": ["sonnet", "claude-sonnet-5-5"], "input": 2.0, "output": 10.0, "cache_read": 0.20, "cache_write_5m": 2.5,   "cache_write_1h": 4.0},
+    "claude:haiku":  {"ids": ["haiku", "claude-haiku-5-5"],   "input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write_5m": 0.125, "cache_write_1h": 0.20,
+                      "note": "10 萬 token 以內的價格；超過時輸入 0.50、輸出 2.50（本表不區分）"},
+    "openai:gpt-6.1-sol":   {"ids": ["gpt-6.1-sol"],   "input": 2.0,  "output": 10.0, "cache_read": 0.10, "cache_write_5m": 0, "cache_write_1h": 0},
+    "openai:gpt-6.1-terra": {"ids": ["gpt-6.1-terra"], "input": 1.0,  "output": 5.0,  "cache_read": 0.05, "cache_write_5m": 0, "cache_write_1h": 0},
+    "openai:gpt-6-astra":   {"ids": ["gpt-6-astra"],   "input": 10.0, "output": 50.0, "cache_read": 1.0,  "cache_write_5m": 0, "cache_write_1h": 0},
+    "openai:gpt-6-luna":    {"ids": ["gpt-6-luna"],    "input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write_5m": 0, "cache_write_1h": 0}
+  }
+}
