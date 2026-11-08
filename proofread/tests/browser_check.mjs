@@ -1,5 +1,6 @@
 // 瀏覽器實測（Playwright＋本機 Chrome／Edge）：外部請求 0、CSP 違規 0、寫入回饋（存檔狀態列四態、手動儲存、未存離開、
 // 定稿與匯入的確認／結果畫面、接續提示、操作紀錄）、復原／重做、播放器、長稿效能。截圖與結果寫到 tests/_out/（不進版控）。
+// 〔1.1.2〕浮動影片視窗：合成影片（materials.py --video，要 ffmpeg）在四種視窗的版面、三種狀態、拖曳與調整大小、記住狀態、同步。
 //
 //   NODE_PATH="$(npm root -g)" node browser_check.mjs
 //
@@ -27,6 +28,8 @@ const SHOTS = path.join(OUT, 'screenshots')
 fs.mkdirSync(SHOTS, { recursive: true })
 
 const cases = []
+let VIDEO_SKIP = null
+const videoLayout = []        // 〔1.1.2〕四種視窗的量測表（寫進 browser.json）
 function rec (name, ok, detail = '') {
   cases.push({ group: '瀏覽器', case: name, result: ok ? 'PASS' : 'FAIL', detail })
   console.log((ok ? 'PASS ' : 'FAIL ') + `[瀏覽器] ${name}` + (detail ? `：${detail}` : ''))
@@ -36,6 +39,8 @@ function prep () {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mmproof-browser-'))
   execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), path.join(work, 'demo')], { env: envFor(work) })
   execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), '--long', path.join(work, 'long')], { env: envFor(work) })
+  // 〔1.1.2〕合成影片（V1 1920×1080、V2 1280×720；測試時才產生，不進版控）。沒有 ffmpeg 時影片的情境略過並寫明
+  try { execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), '--video', path.join(work, 'video')], { env: envFor(work), stdio: 'pipe' }) } catch (e) { VIDEO_SKIP = String(e.stderr || e).trim().split(/\r?\n/).pop() }
   PRO = path.join(work, 'fake-pro-2.2.0')
   execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), '--fake-pro', REAL_PRO, PRO, '2.2.0'], { env: envFor(work) })
   const home = path.join(work, 'home')
@@ -106,6 +111,278 @@ const topRows = page => page.$eval('.top', t => {
   for (const r of rs) { if (r.top >= bottom - 2) { n++; bottom = r.bottom } else bottom = Math.max(bottom, r.bottom) }
   return n
 })
+
+// ---------------------------------------------------------------- 〔1.1.2〕浮動影片視窗（規格 1.1.2 §2）
+const VKEY = 'mmproof-video'
+const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
+function vgeo (page) {
+  return page.evaluate(() => {
+    const R = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
+    const win = document.querySelector('.vwin'), tab = document.querySelector('.vtab'), shell = document.querySelector('.shell')
+    const vid = document.querySelector('.vwin video'), au = document.querySelector('.dock audio')
+    return {
+      vw: document.documentElement.clientWidth, vh: window.innerHeight,
+      scrollW: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      rows: getComputedStyle(shell).gridTemplateRows, mainH: document.querySelector('.main').getBoundingClientRect().height,
+      top: R(document.querySelector('.top')), dock: R(document.querySelector('.dock')),
+      dockVideo: document.querySelectorAll('.dock video').length, audios: document.querySelectorAll('audio').length, videos: document.querySelectorAll('video').length,
+      win: win && { hidden: win.hidden, max: win.classList.contains('s-max'), rect: R(win), body: R(win.querySelector('.vbody')) },
+      tab: tab && { hidden: tab.hidden, rect: R(tab) },
+      vid: vid && { paused: vid.paused, t: vid.currentTime, rate: vid.playbackRate, muted: vid.muted, ready: vid.readyState, w: vid.videoWidth, h: vid.videoHeight },
+      au: au && { paused: au.paused, t: au.currentTime, rate: au.playbackRate },
+      stored: (() => { try { return localStorage.getItem('mmproof-video') } catch (e) { return 'ERR' } })()
+    }
+  })
+}
+// 影片視窗（或標籤）在可放區域內：離頂列下緣、播放列上緣、左右邊至少 gap px
+function inArea (g, rect, gap = 8) {
+  return rect.top >= g.top.bottom + gap - 0.5 && rect.bottom <= g.dock.top - gap + 0.5 && rect.left >= gap - 0.5 && rect.right <= g.vw - gap + 0.5
+}
+const fmtRect = r => r ? `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}` : '—'
+
+async function videoChecks (ctx, work, port, d1id) {
+  if (VIDEO_SKIP) { console.log(`SKIP [瀏覽器] 〔1.1.2〕浮動影片視窗：${VIDEO_SKIP}`); return }
+  const VF = n => path.join(work, 'video', `${n}-demo_minutes`)
+  const vu = launch(work, [VF('V1'), VF('V2')])
+  const idOf = u => decodeURIComponent(u).match(/\/d\/([0-9a-f]{12})/)[1]
+  const v1 = idOf(vu[0]), v2 = idOf(vu[1])
+  const base = `http://127.0.0.1:${port}`
+  const pg = await ctx.newPage()
+  watch(pg)
+  const clearStore = () => pg.evaluate(k => { try { localStorage.removeItem(k) } catch (e) { /* 沒有 */ } }, VKEY).catch(() => {})
+  const waitMeta = () => pg.waitForFunction(() => { const v = document.querySelector('.vwin video'); return v && v.readyState >= 1 }, null, { timeout: 8000 })
+  async function open (id, w, hgt, video = true) {
+    await pg.setViewportSize({ width: w, height: hgt })
+    await pg.goto(`${base}/d/${id}`)
+    await pg.waitForSelector('.mk')
+    if (video) await waitMeta()
+    await pg.waitForTimeout(250)
+  }
+
+  // ---- 四種視窗：錄音（D1）與影片（V1 1920×1080）各開一次
+  for (const [w, hgt] of [[1440, 900], [1707, 735], [1280, 720], [375, 812]]) {
+    await open(d1id, w, hgt, false)
+    const a = await vgeo(pg)
+    await clearStore()
+    await open(v1, w, hgt)
+    const g = await vgeo(pg)
+    let gs = g
+    await shot(pg, `video-${w}x${hgt}-dark.png`)
+    if (g.win.hidden) { await pg.click('.vtab'); await pg.waitForTimeout(200); gs = await vgeo(pg); await shot(pg, `video-${w}x${hgt}-dark-restored.png`) }
+    const narrow = w <= 760
+    const row = { viewport: `${w}×${hgt}`, rows_video: g.rows, rows_audio: a.rows, main_h: Math.round(g.mainH), scroll_w: g.scrollW, vw: g.vw,
+      dock_h_video: g.dock.height, dock_h_audio: a.dock.height, default_state: g.win.hidden ? 'min' : (g.win.max ? 'max' : 'small'),
+      window: fmtRect(gs.win.rect), tab: g.tab.hidden ? '—' : fmtRect(g.tab.rect),
+      gap_top: Math.round(gs.win.rect.top - g.top.bottom), gap_dock: Math.round(gs.dock.top - gs.win.rect.bottom), gap_right: Math.round(gs.vw - gs.win.rect.right) }
+    videoLayout.push(row)
+    const ok = g.mainH > 0 && a.mainH > 0 && g.scrollW <= g.vw && gs.scrollW <= gs.vw && near(g.dock.height, a.dock.height, 0.5) && g.dockVideo === 0 &&
+      inArea(gs, gs.win.rect) && (!narrow || (g.win.hidden && !g.tab.hidden && inArea(g, g.tab.rect))) && (narrow || !g.win.hidden)
+    rec(`〔1.1.2〕${w}×${hgt}：正文列 > 0、沒有橫向捲動、播放列與錄音同高、影片視窗不蓋頂列與播放列${narrow ? '（窄畫面預設最小化標籤）' : ''}`, ok,
+      `grid rows「${g.rows}」、正文 ${row.main_h} px、scrollWidth ${g.scrollW}／${g.vw}、播放列 ${g.dock.height}／錄音 ${a.dock.height} px、預設 ${row.default_state}、視窗 ${row.window}（離頂列 ${row.gap_top}、離播放列 ${row.gap_dock}、離右邊 ${row.gap_right} px）`)
+  }
+  {
+    const a = await (async () => { await open(d1id, 1440, 900, false); return pg.evaluate(() => ({ win: !!document.querySelector('.vwin, .vtab'), audio: document.querySelectorAll('.dock audio').length, video: document.querySelectorAll('video').length })) })()
+    rec('〔1.1.2〕錄音檔：沒有影片視窗與標籤，播放列只有 <audio>（同 1.1.1）', !a.win && a.audio === 1 && a.video === 0, JSON.stringify(a))
+  }
+
+  // ---- 預設小視窗（1440×900）、同步
+  await clearStore()
+  await open(v1, 1440, 900)
+  let g = await vgeo(pg)
+  const s0 = g.win.rect
+  const bodyRatio = g.win.body.width / g.win.body.height
+  rec('〔1.1.2〕預設小視窗：右下角、影片 320×180（保持 16:9）、離邊與播放列 12 px', !g.win.hidden && !g.win.max && near(g.win.body.width, 320) && near(g.win.body.height, 180) &&
+    near(g.vw - s0.right, 12) && near(g.dock.top - s0.bottom, 12) && g.vid.w === 1920 && g.vid.h === 1080,
+    `視窗 ${fmtRect(s0)}、畫面 ${g.win.body.width.toFixed(0)}×${g.win.body.height.toFixed(0)}（${bodyRatio.toFixed(3)}）、影片 ${g.vid.w}×${g.vid.h}`)
+  await pg.evaluate(() => { document.querySelector('.dock audio').muted = true })
+  await pg.click('#p-4 .tc')
+  await pg.waitForTimeout(1500)
+  const gp = await vgeo(pg)
+  await pg.evaluate(() => { document.querySelector('.dock audio').playbackRate = 1.5 })
+  await pg.waitForTimeout(300)
+  const gr = await vgeo(pg)
+  await pg.evaluate(() => { document.querySelector('.dock audio').currentTime = 100 })
+  await pg.waitForTimeout(1000)
+  const gk = await vgeo(pg)
+  await pg.evaluate(() => { document.querySelector('.dock audio').playbackRate = 1 })
+  rec('〔1.1.2〕同步：點時間碼播放、跳轉、播放速度，影片跟著播放列；聲音只有播放列一個（影片靜音）',
+    !gp.au.paused && !gp.vid.paused && gp.au.t >= 44 && Math.abs(gp.vid.t - gp.au.t) < 0.5 && gr.vid.rate === 1.5 && Math.abs(gk.vid.t - gk.au.t) < 0.5 && gk.au.t >= 100 &&
+    gp.vid.muted && gp.audios === 1 && gp.videos === 1,
+    `播放 音 ${gp.au.t.toFixed(2)}／影 ${gp.vid.t.toFixed(2)}；速度 ${gr.au.rate}／${gr.vid.rate}；跳到 100 秒後 音 ${gk.au.t.toFixed(2)}／影 ${gk.vid.t.toFixed(2)}；audio ${gp.audios}、video ${gp.videos}（muted ${gp.vid.muted}）`)
+  await shot(pg, 'video-small-1440-dark.png')
+
+  // ---- 最大化：頂列與播放列之間、保持比例置中；標記選單與對話框在上面；Esc 先關選單，再按才還原
+  await pg.click('.vwin .vbtn[data-act="max"]')
+  await pg.waitForTimeout(200)
+  g = await vgeo(pg)
+  const mr = g.win.rect, aw = g.vw - 24, ah = g.dock.top - g.top.bottom - 24
+  const fill = near(mr.width, aw, 2) || near(mr.height, ah, 2)
+  const centered = near(mr.left - 12, g.vw - 12 - mr.right, 2) && near(mr.top - g.top.bottom - 12, g.dock.top - 12 - mr.bottom, 2)
+  await shot(pg, 'video-max-1440-dark.png')
+  rec('〔1.1.2〕最大化：放大到頂列與播放列之間（扣 12 px 間距）、保持比例置中；按鈕改成「還原」', g.win.max && inArea(g, mr, 11.5) && fill && centered &&
+    near(g.win.body.width / g.win.body.height, 16 / 9, 0.02) && await pg.$eval('.vwin .vbtn[data-act="max"]', b => b.getAttribute('aria-label') === '還原成小視窗' && b.getAttribute('aria-pressed') === 'true'),
+    `視窗 ${fmtRect(mr)}；區域 ${aw}×${ah.toFixed(0)}`)
+  await pg.evaluate(() => document.activeElement && document.activeElement.blur())
+  await pg.keyboard.press('Enter')
+  await pg.waitForSelector('.pop')
+  const popTop = await pg.$eval('.pop', p => { const r = p.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(e && e.closest('.pop')) })
+  await shot(pg, 'video-max-menu-1440-dark.png')
+  await pg.keyboard.press('Escape')
+  const afterEsc1 = await vgeo(pg)
+  const popGone = !(await pg.$('.pop'))
+  await pg.evaluate(() => document.activeElement && document.activeElement.blur())
+  await pg.keyboard.press('?')
+  await pg.waitForSelector('.modal')
+  const modalTop = await pg.$eval('.modal', m => { const r = m.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(e && e.closest('.modal')) })
+  const helpTxt = await pg.$eval('.modal', m => m.textContent)
+  await pg.keyboard.press('Escape')
+  const afterEsc2 = await vgeo(pg)
+  await pg.keyboard.press('Escape')
+  const afterEsc3 = await vgeo(pg)
+  rec('〔1.1.2〕最大化時標記選單與對話框在影片上面；Esc 先關選單（對話框），再按一次才還原成原本的小視窗位置與大小',
+    popTop && modalTop && popGone && afterEsc1.win.max && afterEsc2.win.max && !afterEsc3.win.max && near(afterEsc3.win.rect.left, s0.left) && near(afterEsc3.win.rect.top, s0.top) &&
+    near(afterEsc3.win.rect.width, s0.width) && /影片最大化時還原成小視窗/.test(helpTxt),
+    `選單最上層 ${popTop}、對話框最上層 ${modalTop}；Esc 後 ${afterEsc1.win.max}／${afterEsc2.win.max}／${afterEsc3.win.max}；還原 ${fmtRect(afterEsc3.win.rect)}`)
+  await pg.click('.vwin .vbtn[data-act="max"]')
+  await pg.click('.vwin .vbtn[data-act="max"]')
+  const twice = await vgeo(pg)
+  rec('〔1.1.2〕最大化按鈕再按一次：回到原本的小視窗', !twice.win.max && near(twice.win.rect.left, s0.left) && near(twice.win.rect.top, s0.top), fmtRect(twice.win.rect))
+
+  // ---- 最小化：右下標籤、聲音照常；點一下還原
+  await pg.evaluate(() => { const a = document.querySelector('.dock audio'); if (a.paused) a.play() })
+  await pg.click('.vwin .vbtn[data-act="min"]')
+  await pg.waitForTimeout(400)
+  g = await vgeo(pg)
+  await shot(pg, 'video-min-1440-dark.png')
+  const tr = g.tab.rect
+  const minOk = g.win.hidden && !g.tab.hidden && !g.au.paused && g.vid.paused && inArea(g, tr, 11.5) && near(g.vw - tr.right, 12) && near(g.dock.top - tr.bottom, 12) &&
+    /▶ 影片/.test(await pg.$eval('.vtab', b => b.textContent)) && await pg.evaluate(() => document.activeElement === document.querySelector('.vtab'))
+  await pg.click('.vtab')
+  await pg.waitForTimeout(500)
+  const back = await vgeo(pg)
+  rec('〔1.1.2〕最小化：收成右下「▶ 影片」標籤（離播放列 12 px）、聲音照常播放；點一下還原、影片接著播', minOk && !back.win.hidden && back.tab.hidden &&
+    near(back.win.rect.left, s0.left) && !back.vid.paused && Math.abs(back.vid.t - back.au.t) < 0.5,
+    `標籤 ${fmtRect(tr)}、聲音 ${g.au.paused ? '停' : '播放中'}、影片 ${g.vid.paused ? '暫停' : '播放'}；還原 ${fmtRect(back.win.rect)}、影 ${back.vid.t.toFixed(2)}／音 ${back.au.t.toFixed(2)}`)
+  await pg.evaluate(() => document.querySelector('.dock audio').pause())
+
+  // ---- 拖曳：移動；拖出去會收回可視範圍；調整大小（比例、最小、最大）
+  const dragBy = async (sel, dx, dy, ox = 0, oy = 0) => {
+    const p0 = await pg.$eval(sel, (e, o) => { const r = e.getBoundingClientRect(); return { x: r.left + (o[0] || r.width / 2), y: r.top + (o[1] || r.height / 2) } }, [ox, oy])
+    await pg.mouse.move(p0.x, p0.y); await pg.mouse.down(); await pg.mouse.move(p0.x + dx, p0.y + dy, { steps: 6 }); await pg.mouse.up()
+    await pg.waitForTimeout(100)
+    return (await vgeo(pg))
+  }
+  const m1 = await dragBy('.vwin .vt', -300, -200)
+  const m2 = await dragBy('.vwin .vt', -5000, -5000)
+  const m3 = await dragBy('.vwin .vt', 5000, 5000)
+  rec('〔1.1.2〕拖曳標題列移動；拖到外面會停在可視範圍內（離頂列與左邊 12 px）', near(m1.win.rect.left, s0.left - 300) && near(m1.win.rect.top, s0.top - 200) &&
+    near(m2.win.rect.left, 12) && near(m2.win.rect.top, m2.top.bottom + 12) && near(m3.win.rect.right, s0.right) && near(m3.win.rect.bottom, s0.bottom) && inArea(m2, m2.win.rect, 11.5),
+    `移動 ${fmtRect(m1.win.rect)}；拖到左上外 ${fmtRect(m2.win.rect)}；拖到右下外 ${fmtRect(m3.win.rect)}`)
+  const z1 = await dragBy('.vwin .vgrip', -160, 0, 4, 4)
+  const z2 = await dragBy('.vwin .vgrip', -3000, -3000, 4, 4)
+  const z3 = await dragBy('.vwin .vgrip', 3000, 3000, 4, 4)
+  const z4 = await dragBy('.vwin .vgrip', -200, 0, 4, 4)
+  await shot(pg, 'video-resized-1440-dark.png')
+  rec('〔1.1.2〕從左上角調整大小：右下角固定、保持比例；最小 200 px 寬、最大 960 px 寬',
+    near(z1.win.body.width, 480) && near(z1.win.rect.right, s0.right) && near(z1.win.rect.bottom, s0.bottom) && near(z1.win.body.width / z1.win.body.height, 16 / 9, 0.02) &&
+    near(z2.win.body.width, 960) && near(z3.win.body.width, 200) && near(z4.win.body.width, 400),
+    `+160 → ${z1.win.body.width.toFixed(0)}×${z1.win.body.height.toFixed(0)}；最大 ${z2.win.body.width.toFixed(0)}；最小 ${z3.win.body.width.toFixed(0)}；再拉 ${z4.win.body.width.toFixed(0)}`)
+
+  // ---- 瀏覽器視窗縮小 → 收回可視範圍；再放大 → 回到原位
+  const before = z4.win.rect
+  await pg.setViewportSize({ width: 700, height: 460 })
+  await pg.waitForTimeout(300)
+  const sm = await vgeo(pg)
+  await shot(pg, 'video-shrunk-700x460-dark.png')
+  await pg.setViewportSize({ width: 1440, height: 900 })
+  await pg.waitForTimeout(300)
+  const bg = await vgeo(pg)
+  rec('〔1.1.2〕瀏覽器視窗縮小（700×460）時收回可視範圍、沒有橫向捲動；放大後回到原本位置', inArea(sm, sm.win.rect, 11.5) && sm.scrollW <= sm.vw &&
+    near(bg.win.rect.left, before.left) && near(bg.win.rect.top, before.top) && near(bg.win.rect.width, before.width),
+    `縮小後 ${fmtRect(sm.win.rect)}（頂列下緣 ${sm.top.bottom.toFixed(0)}、播放列上緣 ${sm.dock.top.toFixed(0)}）；放大後 ${fmtRect(bg.win.rect)}`)
+
+  // ---- 鍵盤與 aria：標題列方向鍵移動、Shift＋方向鍵調整大小、Enter 最大化、Esc 還原；按鈕有 title 與 aria-label
+  await pg.focus('.vwin .vbar')
+  await pg.keyboard.press('ArrowLeft'); await pg.keyboard.press('ArrowLeft'); await pg.keyboard.press('ArrowUp')
+  const k1 = await vgeo(pg)
+  await pg.keyboard.press('Shift+ArrowLeft')
+  const k2 = await vgeo(pg)
+  await pg.keyboard.press('Enter')
+  const k3 = await vgeo(pg)
+  await pg.keyboard.press('Escape')
+  const k4 = await vgeo(pg)
+  const aria = await pg.$$eval('.vwin .vbtn, .vtab', bs => bs.every(b => b.title && b.getAttribute('aria-label') && b.tagName === 'BUTTON'))
+  const curNotMoved = await pg.$eval('.mk.cur', e => e.dataset.id)
+  rec('〔1.1.2〕鍵盤：標題列方向鍵移動 16 px、Shift＋方向鍵放大、Enter 最大化、Esc 還原；不觸發校稿快捷鍵；按鈕都有 title 與 aria-label',
+    near(k1.win.rect.left, before.left - 32) && near(k1.win.rect.top, before.top - 16) && near(k2.win.body.width, 432) && k3.win.max && !k4.win.max && aria && !(await pg.$('.pop')),
+    `移動後 ${fmtRect(k1.win.rect)}、放大後畫面寬 ${k2.win.body.width.toFixed(0)}、Enter ${k3.win.max}、Esc ${k4.win.max}；目前標記 ${curNotMoved}`)
+
+  // ---- 記住狀態：重新載入（同一份與另一份稿）
+  const kept = k4.win.rect
+  await pg.reload(); await pg.waitForSelector('.mk'); await waitMeta(); await pg.waitForTimeout(200)
+  const r1 = await vgeo(pg)
+  await pg.click('.vwin .vbtn[data-act="min"]')
+  await pg.reload(); await pg.waitForSelector('.mk'); await pg.waitForTimeout(400)
+  const r2 = await vgeo(pg)
+  await pg.click('.vtab')
+  await pg.click('.vwin .vbtn[data-act="max"]')
+  await open(v2, 1440, 900)
+  const r3 = await vgeo(pg)
+  await shot(pg, 'video-v2-1280x720-max-1440-dark.png')
+  await pg.click('.vwin .vbtn[data-act="max"]')
+  const r4 = await vgeo(pg)
+  rec('〔1.1.2〕記住狀態：重新載入後位置與大小相同；最小化與最大化也記住；開另一份稿（V2 1280×720）沿用，還原回同一個小視窗',
+    near(r1.win.rect.left, kept.left) && near(r1.win.rect.top, kept.top) && near(r1.win.rect.width, kept.width) && r2.win.hidden && !r2.tab.hidden &&
+    r3.win.max && r3.vid.w === 1280 && near(r4.win.rect.left, kept.left) && near(r4.win.rect.width, kept.width) && /"state":"small"/.test(r4.stored),
+    `重新載入 ${fmtRect(r1.win.rect)}；最小化 → ${r2.win.hidden ? 'min' : '?'}；V2 ${r3.vid.w}×${r3.vid.h} ${r3.win.max ? 'max' : '?'} → 還原 ${fmtRect(r4.win.rect)}；${r4.stored}`)
+
+  // ---- 記住的位置在可視範圍外、內容壞掉、localStorage 不能用 → 收回或用預設，頁面照常
+  await pg.evaluate(k => localStorage.setItem(k, JSON.stringify({ state: 'small', rest: 'small', w: 5000, r: 99999, b: 99999 })), VKEY)
+  await open(v1, 1280, 720)
+  const o1 = await vgeo(pg)
+  await pg.evaluate(k => localStorage.setItem(k, '{壞掉'), VKEY)
+  await open(v1, 1440, 900)
+  const o2 = await vgeo(pg)
+  const pb = await ctx.newPage()
+  watch(pb)
+  await pb.addInitScript(() => { Object.defineProperty(window, 'localStorage', { configurable: true, get () { throw new Error('blocked（測試）') } }) })
+  await pb.setViewportSize({ width: 1440, height: 900 })
+  await pb.goto(`${base}/d/${v1}`)
+  await pb.waitForSelector('.mk')
+  await pb.waitForFunction(() => { const v = document.querySelector('.vwin video'); return v && v.readyState >= 1 }, null, { timeout: 8000 })
+  await pb.click('.vwin .vbtn[data-act="max"]')
+  const o3 = await vgeo(pb)
+  await pb.close()
+  rec('〔1.1.2〕記住的位置在可視範圍外 → 收回；內容壞掉或 localStorage 不能用 → 用預設（小視窗、右下），按鈕照常',
+    inArea(o1, o1.win.rect, 11.5) && !o2.win.hidden && near(o2.win.body.width, 320) && near(o2.vw - o2.win.rect.right, 12) && o3.win.max && o3.stored === 'ERR',
+    `超出 → ${fmtRect(o1.win.rect)}；壞掉 → ${fmtRect(o2.win.rect)}；不能用 → ${o3.win.max ? '最大化可用' : '?'}`)
+
+  // ---- 間距、深淺色截圖
+  await clearStore()
+  await open(v1, 1440, 900)
+  const sp = await pg.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect()
+    const vt = r('.vwin .vt'), bmin = r('.vwin .vbtn[data-act="min"]'), bmax = r('.vwin .vbtn[data-act="max"]'), grip = r('.vwin .vgrip'), bar = r('.vwin .vbar')
+    return { textToMin: bmin.left - vt.right, minToMax: bmax.left - bmin.right, maxToEdge: bar.right - bmax.right, gripToText: vt.left - grip.right }
+  })
+  g = await vgeo(pg)
+  rec('〔1.1.2〕間距：標題文字與按鈕 ≥ 4 px、兩個按鈕之間 ≥ 4 px、按鈕與視窗邊 ≥ 2 px、調整大小角與文字 ≥ 4 px；小視窗離播放列與右邊 12 px',
+    sp.textToMin >= 4 && sp.minToMax >= 4 && sp.maxToEdge >= 2 && sp.gripToText >= 4 && near(g.dock.top - g.win.rect.bottom, 12) && near(g.vw - g.win.rect.right, 12),
+    `文字→按鈕 ${sp.textToMin.toFixed(1)}、按鈕之間 ${sp.minToMax.toFixed(1)}、按鈕→邊 ${sp.maxToEdge.toFixed(1)}、角→文字 ${sp.gripToText.toFixed(1)} px`)
+  await pg.click('.top button[title="切換深色／淺色"]')
+  const light = await pg.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), bar: getComputedStyle(document.querySelector('.vbar')).backgroundColor,
+    win: getComputedStyle(document.querySelector('.vwin')).backgroundColor }))
+  await shot(pg, 'video-small-1440-light.png')
+  await pg.click('.vwin .vbtn[data-act="max"]'); await shot(pg, 'video-max-1440-light.png')
+  await pg.click('.vwin .vbtn[data-act="min"]'); await shot(pg, 'video-min-1440-light.png')
+  await pg.click('.vtab'); await pg.click('.vwin .vbtn[data-act="max"]')
+  await pg.click('.top button[title="切換深色／淺色"]')
+  const dark = await pg.evaluate(() => ({ bar: getComputedStyle(document.querySelector('.vbar')).backgroundColor, win: getComputedStyle(document.querySelector('.vwin')).backgroundColor }))
+  rec('〔1.1.2〕深色與淺色：影片視窗的標題列與外框跟著主題變（截圖小、大、最小化各一張）', light.theme === 'light' && light.bar !== dark.bar && light.win !== dark.win,
+    `淺色 標題列 ${light.bar}、外框 ${light.win}；深色 ${dark.bar}、${dark.win}`)
+  await clearStore()
+  await pg.close()
+}
 
 async function main () {
   const { work, home } = prep()
@@ -474,6 +751,7 @@ async function main () {
     `標題「${calmTitle}」、3 秒內變動 ${calm.filter(t => t !== calmTitle).length} 次`)
   await p6.close()
   await p2.close()
+  await videoChecks(ctx, work, new URL(urls[0]).port, did)      // 〔1.1.2〕浮動影片視窗
   shutdown(work)
 
   // ---- 長稿效能：Chrome 與 Edge
@@ -520,7 +798,7 @@ async function main () {
     `CSP ${net.csp.length}、錯誤 ${net.errors.length}（另有預期的模擬儲存失敗與斷線 ${net.expected.length} 筆）${net.errors.slice(0, 3).join('｜')}`)
   const pass = cases.filter(c => c.result === 'PASS').length
   fs.writeFileSync(path.join(OUT, 'browser.json'), JSON.stringify({ pass, total: cases.length, perf, requests: net.total,
-    external: net.external.length, csp: net.csp.length, errors: net.errors, cases }, null, 1))
+    external: net.external.length, csp: net.csp.length, errors: net.errors, video_layout: videoLayout, video_skip: VIDEO_SKIP, cases }, null, 1))
   console.log(`\nbrowser ${pass}/${cases.length} PASS；截圖 ${fs.readdirSync(SHOTS).length} 張 → tests/_out/screenshots/`)
   fs.rmSync(work, { recursive: true, force: true })
   process.exit(pass === cases.length ? 0 : 1)

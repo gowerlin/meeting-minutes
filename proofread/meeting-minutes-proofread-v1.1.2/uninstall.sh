@@ -1,5 +1,5 @@
 #!/bin/bash
-# 會議記錄校稿 1.1.1 移除程式（macOS）
+# 會議記錄校稿 1.1.2 移除程式（macOS）
 #   - 停止執行中的服務（開著的分頁先存檔）；刪除程式（proofread/app）、version.json、config.json、移除程式本身、
 #     ~/Applications/會議記錄校稿.app（含「.mmproof」的雙擊開啟）
 #   - 詢問是否刪除最近的稿清單（proofread/state，預設保留）

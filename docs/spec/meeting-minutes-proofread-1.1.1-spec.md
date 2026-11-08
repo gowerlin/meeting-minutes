@@ -3,6 +3,7 @@
 > **公開版**：本檔是會議記錄校稿 **1.1.1** 規格的公開版。內容是 **1.1.1 相對 1.1.0 的差異**（修正版）；本檔沒有提到的行為一律照
 > 1.1 規格（公開版 [`meeting-minutes-proofread-1.1-spec.md`](meeting-minutes-proofread-1.1-spec.md)；下稱「1.1 規格」）與 1.1.0 的程式。
 > 搭配：meeting-minutes-pro 2.4.1 規格（公開版 [`meeting-minutes-pro-2.4.1-spec.md`](meeting-minutes-pro-2.4.1-spec.md)，下稱「Pro 2.4.1 規格」）§2。
+> **1.1.2 修正**（影片改放浮動視窗，不再蓋住逐字稿）見 [`meeting-minutes-proofread-1.1.2-spec.md`](meeting-minutes-proofread-1.1.2-spec.md)。
 > **章節號與開發用的原規格相同**：程式註解寫的「規格 1.1.1 §x.y」就是本檔的同一節。
 > 版本目錄 `V/`＝`proofread/meeting-minutes-proofread-v1.1.1/`（公開 repo 的路徑）。
 > 標示：**〔實測〕**＝實作時以合成素材實測的結果（附錄 A）；**〔推論〕**＝未直接驗證；**〔規格決定〕**＝本規格自行決定的細節。

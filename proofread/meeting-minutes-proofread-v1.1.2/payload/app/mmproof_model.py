@@ -12,7 +12,7 @@ import hashlib
 import re
 from datetime import datetime
 
-TOOL_VERSION = "1.1.1"
+TOOL_VERSION = "1.1.2"
 SESSION_PREFIX = "mm-proofread-session/"
 SESSION_MAJOR = 1
 SESSION_FORMAT = f"{SESSION_PREFIX}{SESSION_MAJOR}"

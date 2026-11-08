@@ -99,6 +99,7 @@ const EXPECTED = [
   ['docs/spec/meeting-minutes-proofread-1.1-spec.md', '會議記錄校稿 1.1 公開版規格（認得本機限定）'],
   ['docs/spec/meeting-minutes-pro-2.4.1-spec.md', '2.4.1 公開版規格（config.json 讀不了時當成本機限定）'],
   ['docs/spec/meeting-minutes-proofread-1.1.1-spec.md', '會議記錄校稿 1.1.1 公開版規格（同上）'],
+  ['docs/spec/meeting-minutes-proofread-1.1.2-spec.md', '會議記錄校稿 1.1.2 公開版規格（影片浮動視窗）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.cmd', '會議記錄校稿（Windows 入口）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.ps1', '會議記錄校稿（Windows 安裝）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.sh', '會議記錄校稿（macOS 安裝）'],

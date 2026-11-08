@@ -2,6 +2,7 @@
 
   python -B materials.py <目錄>            產生 D1、D2、D3 三份輸出資料夾（D1 附合成提示音 D1-demo.wav）
   python -B materials.py --long <目錄>     另外產生 3 小時的長稿 LONG-demo_minutes（效能測試）
+  python -B materials.py --video <目錄>    〔1.1.2〕產生 V1（1920×1080）、V2（1280×720）兩份附合成影片的輸出資料夾（要 ffmpeg）
 
 每個資料夾有 transcript.json（含 segments）、transcript.md、transcript.corrected.md（Pro 2.2.0 的標記）與
 meeting-minutes.md 或 notes.md。transcript.md 依 Pro transcribe.write_outputs() 的接字規則由 segments 組成，
@@ -12,6 +13,7 @@ import math
 import random
 import re
 import shutil
+import subprocess
 import sys
 import wave
 from pathlib import Path
@@ -233,6 +235,34 @@ def make_long(root: Path) -> Path:
     return folder
 
 
+# ---------------------------------------------------------------- 〔1.1.2〕合成影片（浮動影片視窗的測試）
+VIDEO_SIZES = {"V1": (1920, 1080, "0x2b4c7e"), "V2": (1280, 720, "0x7e4c2b")}
+
+
+def make_video(root: Path, ffmpeg: str = "ffmpeg") -> dict:
+    """V1、V2：內容同 D1（標記、講者），原始檔是合成影片 <名稱>-demo.mp4：純色畫面，左上角疊一小塊 ffmpeg 內建的
+    testsrc2 測試圖（會動，看得出畫面有沒有在播）；聲音是 D1 的合成提示音。不用真實影片。沒有 ffmpeg → RuntimeError。"""
+    if not shutil.which(ffmpeg):
+        raise RuntimeError("找不到 ffmpeg（合成影片要用）")
+    root.mkdir(parents=True, exist_ok=True)
+    out = {}
+    for name, (w, hgt, color) in VIDEO_SIZES.items():
+        spec = dict(D1, source=f"{name}-demo.mp4", title=f"{name}-demo.mp4", minutes=D1["minutes"].replace("D1-demo.wav", f"{name}-demo.mp4"))
+        folder = root / f"{name}-demo_minutes"
+        dur, _ = build(spec, folder)
+        wav = root / f"{name}-demo.tmp.wav"
+        make_wav(wav, dur, [i * spec["gap"] for i in range(len(spec["paras"]))])
+        vf = (f"color=c={color}:s={w}x{hgt}:r=5:d={dur}[bg];testsrc2=s=320x180:r=5:d={dur}[t];"
+              f"[bg][t]overlay=24:24[v]")
+        subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex", vf, "-i", str(wav),
+                        "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "38", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-b:a", "48k", "-shortest", "-movflags", "+faststart", str(root / spec["source"])],
+                       check=True, capture_output=True)
+        wav.unlink()
+        out[name] = folder
+    return out
+
+
 # ---------------------------------------------------------------- 假的 meeting-minutes-pro
 FAKE_AUTO_MINUTES = r'''"""測試用的假 auto_minutes.py（不呼叫模型）。只支援 --source final 的 --estimate-only 與 --force。
 $MMH/fake-exit.txt 寫了 exit code 時模擬失敗。"""
@@ -301,6 +331,8 @@ if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] == ["--long"]:
         print(make_long(Path(a[1])))
+    elif a[:1] == ["--video"]:
+        print(make_video(Path(a[1])))
     elif a[:1] == ["--fake-pro"]:                          # 〔1.1.0〕瀏覽器測試用：--fake-pro <真的 scripts> <目的> <版號>
         print(make_fake_pro(Path(a[1]), Path(a[2]), version=a[3]))
     else:

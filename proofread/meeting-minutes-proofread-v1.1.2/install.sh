@@ -1,5 +1,5 @@
 #!/bin/bash
-# 會議記錄校稿 1.1.1 安裝程式（macOS；meeting-minutes-pro 的附屬工具）
+# 會議記錄校稿 1.1.2 安裝程式（macOS；meeting-minutes-pro 的附屬工具）
 #   - 需要先安裝 meeting-minutes-pro 2.2.0 以上（~/Library/Application Support/meeting-minutes-pro，
 #     或環境變數 MEETING_MINUTES_PRO_HOME）
 #   - 把程式複製到 <Pro 的資料夾>/proofread/app（升級時整個換新；最近的稿清單 state/ 與 config.json 保留）
@@ -12,7 +12,7 @@
 
 set -o pipefail
 
-VERSION="1.1.1"
+VERSION="1.1.2"
 MIN_PRO="2.2.0"
 TOOL_NAME="會議記錄校稿"
 UTI="local.meeting-minutes-proofread.mmproof"

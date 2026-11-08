@@ -4,10 +4,10 @@
   "basicVersion": "1.0.1",
   "basicTag": "basic-v1.0.1",
   "releasedAt": "2026-11-08",
-  "proofreadVersion": "1.1.1",
-  "proofreadTag": "proofread-v1.1.1",
+  "proofreadVersion": "1.1.2",
+  "proofreadTag": "proofread-v1.1.2",
   "proofreadMinPro": "2.2.0",
-  "proofreadReleasedAt": "2026-11-08",
+  "proofreadReleasedAt": "2026-11-09",
   "assets": {
     "pro": [
       { "name": "meeting-minutes-pro-v2.4.1-installer.zip", "sha256": "1a56c56e3410b4e4d5d4516a83c424e13164f1a5f8513ca253dfc9cbcbb6c968" },
@@ -18,7 +18,7 @@
       { "name": "meeting-minutes-v1.0.1-claude-app-upload.zip", "sha256": "340eb721a43317dc44a36117b3774f03fa6127a1ed3f04ff71bf2ba9089602cd" }
     ],
     "proofread": [
-      { "name": "meeting-minutes-proofread-v1.1.1-installer.zip", "sha256": "11e4cb1218d666c36e7e92ac925775a4a19b6bfa9237ff1b9aca548de11d132b" }
+      { "name": "meeting-minutes-proofread-v1.1.2-installer.zip", "sha256": "0c2e67cf05f4fa1a806150d3893f81f264fb101c0a1f73b53c7fdd122f2657e5" }
     ]
   }
 }

@@ -1,4 +1,4 @@
-/* 會議記錄校稿 1.0.0。色彩 token 與 meeting-minutes-pro 2.1 網頁版相同：預設深色，淺色寫在 [data-theme="light"]。
+/* 會議記錄校稿 1.0.0（1.1.2 加浮動影片視窗）。色彩 token 與 meeting-minutes-pro 2.1 網頁版相同：預設深色，淺色寫在 [data-theme="light"]。
    元件只引用 token。狀態不只靠顏色：每個狀態另有圖示與文字。 */
 :root {
   --bg: #10151b; --surface: #171e26; --band: #1c242e; --ink: #e5eaf0; --ink-2: #9daaba;
@@ -102,6 +102,29 @@ table.plan td:first-child { white-space: nowrap; padding-right: 12px; }
 .dock { grid-area: dock; border-top: 1px solid var(--line); background: var(--surface); padding: 6px 16px; display: flex; gap: 12px; align-items: center; }
 .dock audio { flex: 1; height: 36px; }
 .dock .lbl { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* 〔1.1.2〕影片（規格 1.1.2 §2）：底部播放列一律只放 <audio> 的播放控制（錄音與影片同高）；畫面在浮動視窗（靜音的 <video>，跟著播放列同步）。
+   z-index 次序：浮動視窗與最小化標籤 20 ＜ 選取工具列 25 ＜ 標記選單 30 ＜ 提示 35 ＜ 對話框 40。位置與大小由 app.js 設定 */
+.vwin { position: fixed; z-index: 20; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.vwin[hidden], .vtab[hidden] { display: none; }
+.vbar { flex: none; height: 32px; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 18px; background: var(--band);
+  border-bottom: 1px solid var(--line); cursor: move; user-select: none; touch-action: none; }
+.vwin.s-max .vbar { cursor: default; padding-left: 10px; }
+.vbar:focus-visible { outline-offset: -2px; }
+.vbar .vt { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vbtn { flex: none; width: 28px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink);
+  cursor: pointer; font-size: 14px; line-height: 1; }
+.vbtn:hover { border-color: var(--accent); background: var(--surface); }
+.vbody { position: relative; flex: 1; min-height: 0; background: #000; }
+.vbody video { display: block; width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+.vmsg { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px 12px; text-align: center; font-size: 13px; color: #dfe5ec; }
+.vmsg[hidden] { display: none; }
+.vgrip { position: absolute; left: 0; top: 0; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, var(--line-strong) 0 45%, transparent 45%); }
+.vgrip:hover { background: linear-gradient(135deg, var(--accent) 0 45%, transparent 45%); }
+.vwin.s-max .vgrip { display: none; }
+.btn.vtab { position: fixed; z-index: 20; box-shadow: var(--shadow); }
 
 .banner { border: 1px solid var(--line-strong); border-left: 4px solid var(--accent-2); background: var(--band); border-radius: 6px;
   padding: 10px 14px; margin: 0 0 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

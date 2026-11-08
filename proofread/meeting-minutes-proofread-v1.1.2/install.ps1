@@ -1,5 +1,5 @@
 ﻿<#
-  會議記錄校稿 1.1.1 安裝程式（Windows；meeting-minutes-pro 的附屬工具，不需要系統管理員）
+  會議記錄校稿 1.1.2 安裝程式（Windows；meeting-minutes-pro 的附屬工具，不需要系統管理員）
   - 需要先安裝 meeting-minutes-pro 2.2.0 以上（偵測 %LOCALAPPDATA%\meeting-minutes-pro，或環境變數 MEETING_MINUTES_PRO_HOME）
   - 把程式複製到 <Pro 的資料夾>\proofread\app（升級時整個換新；最近的稿清單 state\ 與 config.json 保留）
   - 建立右鍵「傳送到 → 會議記錄校稿」與「會議記錄校稿.mmproof」的雙擊開啟（只寫目前使用者的登錄 HKCU）
@@ -20,7 +20,7 @@ $PSDefaultParameterValues["*-ItemProperty:ErrorAction"] = "Stop"
 $env:PYTHONUTF8 = "1"
 $env:PYTHONDONTWRITEBYTECODE = "1"      # 不在 Pro 的 scripts\ 與本程式資料夾留下 __pycache__
 
-$Version  = "1.1.1"
+$Version  = "1.1.2"
 $MinPro   = "2.2.0"
 $ToolName = "會議記錄校稿"
 $Here     = Split-Path -Parent $MyInvocation.MyCommand.Path

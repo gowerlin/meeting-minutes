@@ -1,4 +1,4 @@
-// 會議記錄校稿 1.1.1 前端。只連本機服務（CSP connect-src 'self'），不載入任何外部資源。
+// 會議記錄校稿 1.1.2 前端。只連本機服務（CSP connect-src 'self'），不載入任何外部資源。
 // 所有文字都用 textContent 放進頁面（不拼 innerHTML），逐字稿裡的 <…> 不會被當成 HTML。
 'use strict';
 (function () {
@@ -261,7 +261,9 @@
       el.side = h('aside', { class: 'side', 'aria-label': '側欄' });
       el.shell = h('div', { class: 'shell' }, top, el.toc, el.main, el.side);
       if (d.media && d.media.status === 'found') {
-        el.audio = h(d.media.type === 'video' ? 'video' : 'audio', { controls: true, preload: 'metadata', src: '/api/doc/' + id + '/media' });
+        // 〔1.1.2〕底部播放列一律是 <audio>：唯一的聲音來源與播放控制，錄音與影片同高（1.1.1 影片時放 <video>，照原始大小撐開這一列、
+        //         蓋住正文）。影片的畫面放在浮動視窗（videoWin），用靜音的 <video> 跟著播放列同步
+        el.audio = h('audio', { controls: true, preload: 'metadata', src: '/api/doc/' + id + '/media' });
         el.shell.appendChild(h('footer', { class: 'dock' }, h('span', { class: 'lbl', text: '原始' + (d.media.type === 'video' ? '影片' : '錄音') + '：' + d.media.name }), el.audio));
       } else if (d.media && d.media.status === 'unsupported') {
         el.shell.appendChild(h('footer', { class: 'dock' }, h('span', { class: 'lbl', text: '原始檔格式 ' + d.media.ext + ' 瀏覽器多半不能播放，時間碼以文字顯示。' })));
@@ -269,6 +271,7 @@
         el.shell.appendChild(h('footer', { class: 'dock' }, h('span', { class: 'lbl', text: '找不到原始錄音或影片（放在輸出資料夾旁、同檔名），時間碼以文字顯示。' })));
       }
       app.appendChild(el.shell);
+      if (el.audio && d.media.type === 'video') videoWin(d.media.name);
       el.main.appendChild(el.banners);
       el.main.appendChild(legend());
       var frag = document.createDocumentFragment();
@@ -294,6 +297,156 @@
         if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key && e.key.toLowerCase() === 's') { e.preventDefault(); save({ manual: true }); }
       }, true);
       banners();
+    }
+    // ---- 〔1.1.2〕浮動影片視窗（規格 1.1.2 §2）。三種狀態：small（小視窗，預設在右下）、max（最大化：頂列與底部播放列之間）、
+    //      min（最小化：右下的「▶ 影片」標籤，聲音照常）。小視窗可拖曳標題列移動、拖左上角調整大小（保持比例），不出可視範圍；
+    //      狀態、位置與大小存在 localStorage（mmproof-video）。位置用「離可放區域右下角的距離」記，換視窗大小也貼著右下
+    function videoWin(name) {
+      var KEY = 'mmproof-video', GAP = 12, BAR = 32, FR = 2, MINW = 200, MAXW = 960, DEFW = 320, DRIFT = 0.3;
+      var V = { state: 'small', rest: 'small', w: DEFW, r: 0, b: 0, ratio: 16 / 9, cur: null };
+      var st = null;
+      try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { st = null; }   // 讀不到或壞掉：用預設
+      if (st && typeof st === 'object') {
+        if (st.state === 'small' || st.state === 'max' || st.state === 'min') V.state = st.state;
+        if (st.rest === 'small' || st.rest === 'max') V.rest = st.rest;
+        if (typeof st.w === 'number' && isFinite(st.w) && st.w > 0) V.w = st.w;
+        if (typeof st.r === 'number' && isFinite(st.r) && st.r >= 0) V.r = st.r;
+        if (typeof st.b === 'number' && isFinite(st.b) && st.b >= 0) V.b = st.b;
+      } else if (window.matchMedia('(max-width: 760px)').matches) V.state = 'min';     // 窄畫面預設最小化
+      if (V.state !== 'min') V.rest = V.state;
+      var au = el.audio;
+      var vid = h('video', { muted: true, playsinline: true, preload: 'metadata', disablepictureinpicture: true, disableremoteplayback: true,
+        src: au.getAttribute('src'), title: '點一下播放或暫停（聲音與播放控制在下方的播放列）', 'aria-label': '影片畫面（聲音與播放控制在下方的播放列）' });
+      vid.muted = true; vid.defaultMuted = true;
+      var msg = h('div', { class: 'vmsg', hidden: true });
+      var bMin = h('button', { class: 'vbtn', type: 'button', 'data-act': 'min', title: '最小化（聲音照常播放）', 'aria-label': '最小化影片視窗（聲音照常播放）',
+        onclick: function () { setState('min'); } }, '−');
+      var bMax = h('button', { class: 'vbtn', type: 'button', 'data-act': 'max', onclick: function () { setState(V.state === 'max' ? 'small' : 'max'); } });
+      var bar = h('div', { class: 'vbar', tabindex: '0', 'aria-label': '影片視窗標題列：方向鍵移動、Shift＋方向鍵調整大小、Enter 最大化或還原' },
+        h('span', { class: 'vt', title: name, text: '影片：' + name }), bMin, bMax);
+      var grip = h('div', { class: 'vgrip', title: '拖曳調整大小', 'aria-hidden': 'true' });
+      var win = h('section', { class: 'vwin', role: 'region', 'aria-label': '影片視窗' }, bar, h('div', { class: 'vbody' }, vid, msg), grip);
+      var tab = h('button', { class: 'btn vtab', type: 'button', title: '還原影片視窗', 'aria-label': '還原影片視窗', onclick: function () { setState(V.rest); } }, '▶ 影片');
+      document.body.appendChild(win);
+      document.body.appendChild(tab);
+      el.vwin = win; el.vtab = tab;
+
+      function area() {      // 可放的區域：頂列下緣與底部播放列上緣之間，四邊各留 GAP
+        var top = el.shell.querySelector('.top').getBoundingClientRect().bottom;
+        var dock = el.shell.querySelector('.dock').getBoundingClientRect().top;
+        var vw = document.documentElement.clientWidth;
+        return { l: GAP, t: top + GAP, r: vw - GAP, b: dock - GAP, dock: dock, vh: window.innerHeight };
+      }
+      function fitW(w, A) {  // 影片寬：最小 MINW、最大 MAXW，且整個視窗放得進區域（區域太小時以區域為準）
+        var most = Math.max(0, Math.min(MAXW, A.r - A.l - FR, (A.b - A.t - BAR - FR) * V.ratio));
+        return Math.max(Math.min(MINW, most), Math.min(w, most));
+      }
+      function layout() {
+        var A = area();
+        win.hidden = V.state === 'min'; tab.hidden = V.state !== 'min';
+        win.classList.toggle('s-max', V.state === 'max');
+        var isMax = V.state === 'max';
+        bMax.textContent = isMax ? '❐' : '□';
+        bMax.title = isMax ? '還原成小視窗（Esc）' : '最大化';
+        bMax.setAttribute('aria-label', isMax ? '還原成小視窗' : '最大化影片視窗');
+        bMax.setAttribute('aria-pressed', String(isMax));
+        if (V.state === 'min') {
+          tab.style.right = GAP + 'px';
+          tab.style.bottom = Math.max(GAP, A.vh - A.dock + GAP) + 'px';
+          return;
+        }
+        var aw = A.r - A.l, ah = A.b - A.t, w, x, y, oh;
+        if (isMax) {
+          w = Math.max(0, Math.min(aw - FR, (ah - BAR - FR) * V.ratio));
+          oh = w / V.ratio + BAR + FR;
+          x = A.l + (aw - w - FR) / 2; y = A.t + (ah - oh) / 2;
+        } else {
+          w = fitW(V.w, A);
+          oh = w / V.ratio + BAR + FR;
+          var r = Math.max(0, Math.min(V.r, aw - w - FR)), b = Math.max(0, Math.min(V.b, ah - oh));
+          x = A.r - r - w - FR; y = A.b - b - oh;
+          V.cur = { w: w, r: r, b: b };
+        }
+        win.style.left = Math.round(x) + 'px'; win.style.top = Math.round(y) + 'px';
+        win.style.width = Math.round(w + FR) + 'px'; win.style.height = Math.round(oh) + 'px';
+      }
+      function store() {
+        try { localStorage.setItem(KEY, JSON.stringify({ state: V.state, rest: V.rest, w: Math.round(V.w), r: Math.round(V.r), b: Math.round(V.b) })); }
+        catch (e) { /* 只是記住偏好 */ }
+      }
+      function commit() { if (V.cur) { V.w = V.cur.w; V.r = V.cur.r; V.b = V.cur.b; } store(); }
+      function setState(s) {
+        V.state = s;
+        if (s !== 'min') V.rest = s;
+        layout(); follow(); store();
+        if (s === 'min') tab.focus({ preventScroll: true });
+        else if (document.activeElement === tab) bar.focus({ preventScroll: true });
+      }
+      // 同步：播放列是主，影片跟著（播放、暫停、跳轉、速度）；差距超過 DRIFT 秒才校正。最小化時影片暫停（聲音照常）
+      function sync(force) {
+        if (V.state === 'min' || vid.readyState < 1) return;
+        if (force || Math.abs(vid.currentTime - au.currentTime) > DRIFT) { try { vid.currentTime = au.currentTime; } catch (e) { /* 還不能跳 */ } }
+      }
+      function follow() {
+        if (vid.playbackRate !== au.playbackRate) vid.playbackRate = au.playbackRate;
+        sync(true);
+        if (V.state !== 'min' && !au.paused && !au.ended) vid.play().catch(function () { /* 畫面跟不上不影響聲音 */ });
+        else vid.pause();
+      }
+      ['play', 'pause', 'ended', 'seeked', 'ratechange'].forEach(function (ev) { au.addEventListener(ev, follow); });
+      au.addEventListener('timeupdate', function () { sync(false); });
+      vid.addEventListener('loadedmetadata', function () {
+        if (vid.videoWidth && vid.videoHeight) V.ratio = vid.videoWidth / vid.videoHeight;
+        layout(); follow();
+      });
+      vid.addEventListener('error', function () { msg.hidden = false; msg.textContent = '瀏覽器不能顯示這個影片的畫面；聲音照常從下方的播放列播放。'; });
+      vid.addEventListener('click', function () { if (au.paused) au.play().catch(function () { /* 再按一次 */ }); else au.pause(); });
+
+      // 拖曳（標題列＝移動；左上角＝調整大小，右下角固定、保持比例）
+      function drag(mode) {
+        return function (e) {
+          if (V.state !== 'small' || e.button !== 0 || (mode === 'move' && e.target.closest('button'))) return;
+          e.preventDefault();
+          layout();
+          var A = area(), s = V.cur, sx = e.clientX, sy = e.clientY, tgt = e.currentTarget;
+          try { tgt.setPointerCapture(e.pointerId); } catch (x) { /* 沒有 pointer capture 時照樣可拖 */ }
+          function mv(ev) {
+            var dx = ev.clientX - sx, dy = ev.clientY - sy;
+            if (mode === 'move') { V.r = Math.max(0, s.r - dx); V.b = Math.max(0, s.b - dy); }
+            else { var dd = Math.abs(dx) >= Math.abs(dy * V.ratio) ? dx : dy * V.ratio; V.w = fitW(s.w - dd, A); V.r = s.r; V.b = s.b; }
+            layout();
+          }
+          function up() { tgt.removeEventListener('pointermove', mv); tgt.removeEventListener('pointerup', up); tgt.removeEventListener('pointercancel', up); commit(); }
+          tgt.addEventListener('pointermove', mv); tgt.addEventListener('pointerup', up); tgt.addEventListener('pointercancel', up);
+        };
+      }
+      bar.addEventListener('pointerdown', drag('move'));
+      grip.addEventListener('pointerdown', drag('resize'));
+      bar.addEventListener('dblclick', function (e) { if (!e.target.closest('button')) setState(V.state === 'max' ? 'small' : 'max'); });
+      bar.addEventListener('keydown', function (e) {
+        if (e.target !== bar) return;
+        var k = e.key, step = 16;
+        if (k === 'Enter' || k === ' ') setState(V.state === 'max' ? 'small' : 'max');
+        else if (/^Arrow(Left|Right|Up|Down)$/.test(k) && V.state === 'small') {
+          var c = V.cur;
+          if (e.shiftKey) V.w = fitW(c.w + (k === 'ArrowLeft' || k === 'ArrowUp' ? 2 * step : -2 * step), area());
+          else {
+            V.r = Math.max(0, c.r + (k === 'ArrowLeft' ? step : k === 'ArrowRight' ? -step : 0));
+            V.b = Math.max(0, c.b + (k === 'ArrowUp' ? step : k === 'ArrowDown' ? -step : 0));
+          }
+          layout(); commit();
+        } else return;
+        e.preventDefault(); e.stopPropagation();
+      });
+      // Esc：最大化時還原（標記選單與對話框開著時由它們處理）
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || V.state !== 'max' || el.pop || document.querySelector('.modal-bg')) return;
+        e.preventDefault(); setState('small');
+      });
+      // 瀏覽器視窗或頂列、播放列的高度改變時重新放進可視範圍（不改記住的位置；視窗再放大時回到原位）
+      window.addEventListener('resize', layout);
+      if (window.ResizeObserver) { var ro = new ResizeObserver(function () { layout(); }); ro.observe(el.shell.querySelector('.top')); ro.observe(el.shell.querySelector('.dock')); }
+      layout();
     }
     function sideBtn(k, label) {
       return h('button', { class: 'btn' + (S.side === k ? ' on' : ''), type: 'button', 'data-side': k, onclick: function () { openSide(S.side === k ? null : k); } }, label);
@@ -749,6 +902,7 @@
       if (el.pop || document.querySelector('.modal-bg')) return;
       var tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.target.closest && e.target.closest('.vwin, .vtab')) return;      // 〔1.1.2〕影片視窗的按鈕與標題列自己處理按鍵
       var k = (e.key || '').toLowerCase();
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) redoAct(); else undo(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redoAct(); return; }
@@ -775,7 +929,8 @@
     function help() {
       var rows = [['J／N', '下一個未處理標記'], ['K／P', '上一個未處理標記'], ['Enter', '開啟目前標記的選單'], ['A', '接受建議（修正、推測、統一）並跳下一個'],
         ['R', '退回（用原文）並跳下一個'], ['E', '有選取文字時＝修改選取文字；否則＝目前標記的自由輸入'], ['1～3', '選單裡選第幾個選項'], ['Ctrl＋Z／Ctrl＋Y（⌘）', '復原／重做'],
-        ['Ctrl＋S（⌘S）', '立刻儲存'], ['.', '從目前段落播放'], ['U', '只看未處理'], ['?', '這份說明'], ['Esc', '關閉選單或對話框']];
+        ['Ctrl＋S（⌘S）', '立刻儲存'], ['.', '從目前段落播放'], ['U', '只看未處理'], ['?', '這份說明'], ['Esc', '關閉選單或對話框；影片最大化時還原成小視窗'],
+        ['方向鍵（影片標題列）', '移動影片小視窗；加 Shift＝調整大小；Enter＝最大化或還原']];
       modal('鍵盤操作', [h('table', { class: 'help' }, rows.map(function (r) { return h('tr', null, h('td', null, h('span', { class: 'kbd', text: r[0] })), h('td', { text: r[1] })); }))], [{ label: '關閉', primary: true }]);
     }
 
