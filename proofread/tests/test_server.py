@@ -22,6 +22,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import helpers as H  # noqa: E402
+import mmproof_model as M  # noqa: E402  〔1.1.1〕版號判斷（helpers 已把本工具的 app 放上 sys.path）
+import mmproof_pro as P  # noqa: E402
 
 R = H.Results("整合")
 SECRETS = []                 # 權杖、cookie、交接密鑰：最後確認都沒有進 server.log
@@ -686,6 +688,61 @@ def main():
     R.rec("沒有本機限定：重做是否可用只看 Pro 版號（2.2 停用、2.3／2.4 可用），首頁不標示", lo_ok["plain"],
           "；".join(x for x in lo_detail if "一般" in x))
     R.rec("本機限定時其他功能照常（定稿寫出 transcript.final.md）", lo_ok["other"], "")
+
+    # ================================================================ 〔1.1.1〕Pro 的 config.json 讀不了或值看不懂 → 本機限定
+    if P.version_ge(M.TOOL_VERSION, "1.1.1"):
+        cu_ok, cu_detail = True, []
+        fv = H.materials.make_fake_pro(H.PRO_SCRIPTS, work / "fake-pro-cu", version="2.4.1")
+        for mode, raw, want_reason, want_text in (
+                ("bad_json", '{"runtime_version": "2.4.1", "privacy": {"local_only": false},', "bad_json",
+                 "meeting-minutes-pro 的 config.json 讀不了：不是合法的 JSON"),
+                ("bad_value", '{"runtime_version": "2.4.1", "privacy": {"local_only": "true"}}', "bad_value",
+                 'meeting-minutes-pro 的 config.json 的值看不懂：privacy.local_only 是 "true"')):
+            hv = H.make_home(work, f"home-cu-{mode}", {"runtime_version": "2.4.1"})
+            base = work / "cu" / mode
+            folders = []
+            for name in ("D2-demo_minutes", "D3-demo_minutes"):
+                fd = base / name
+                shutil.copytree(D[name[:2]], fd)
+                shutil.rmtree(fd / ".proofread", ignore_errors=True)
+                folders.append(fd)
+            (folders[1] / "local-only.json").write_text('{"local_only": true, "source": "sendto"}\n', encoding="utf-8")
+            rv, uv, _, _ = H.launch(hv, folders, env=H.base_env(hv, fv))
+            (hv / "config.json").write_text(raw, encoding="utf-8")      # 服務啟動後才弄壞：每次請求都重新判定
+            iv = H.instance(hv)
+            T = H.Tab(iv["port"], f"cu-{mode}")
+            T.login(collect(uv)[0])
+            _, docs = T.js("GET", "/api/docs")
+            srcs = {o["name"]: o.get("local_only_source") for o in docs["open"]}
+            ok = (docs["local_only_global"] is True and docs.get("local_only_global_source") == "config-unreadable"
+                  and want_text in (docs.get("local_only_global_message") or "")
+                  and srcs == {folders[0].name: "config-unreadable", folders[1].name: "config-unreadable+marker"}
+                  and all(o["local_only"] is True for o in docs["open"]))
+            for k, did in enumerate(x["id"] for x in rv):
+                T.lease(did)
+                _, dv = T.data(did)
+                st_r, rr = T.post(did, "redo", {"dry_run": True})
+                lo = dv.get("local_only") or {}
+                ok &= (lo.get("sources") == (["config-unreadable"] if k == 0 else ["config-unreadable", "marker"])
+                       and (lo.get("config_problem") or {}).get("reason") == want_reason
+                       and dv["redo"]["available"] is False and dv["redo"]["local_only"] is True
+                       and want_text in dv["redo"]["reason"] and "為了不外送，已當成本機限定" in dv["redo"]["reason"]
+                       and st_r == 409 and rr.get("error") == "local_only" and want_text in (rr.get("message") or "")
+                       and str(hv / "config.json") in (rr.get("message") or ""))
+                if k == 0:                                             # 其他功能照常
+                    st_f, _ = T.post(did, "finalize", {"allow_pending": True})
+                    ok &= st_f == 200 and (folders[0] / "transcript.final.md").exists()
+            # 修好之後（重新整理）恢復：只剩標記檔那一份
+            (hv / "config.json").write_text('{"runtime_version": "2.4.1", "privacy": {"local_only": false}}', encoding="utf-8")
+            _, docs2 = T.js("GET", "/api/docs")
+            ok &= docs2["local_only_global"] is False and "local_only_global_source" not in docs2 and \
+                {o["name"]: o.get("local_only_source") for o in docs2["open"]} == {folders[0].name: None, folders[1].name: "marker"}
+            H.stop(hv)
+            cu_ok &= bool(ok)
+            cu_detail.append(f"{mode}：{'OK' if ok else 'NG'}")
+        R.rec("〔1.1.1〕Pro 的 config.json 讀不了或值看不懂：首頁 local_only_global（來源 config-unreadable、訊息）、"
+              "每份的來源（含 +marker）、頁面 local_only 與重做停用的原因、重做 API 409 local_only 的訊息（原因與路徑）、定稿照常、修好後恢復",
+              cu_ok, "；".join(cu_detail))
 
     # ================================================================ server.log
     logs = "".join(p.read_text(encoding="utf-8") for p in work.rglob("server.log*"))

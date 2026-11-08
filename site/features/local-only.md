@@ -1,6 +1,6 @@
 ---
 title: 本機限定（機敏會議）
-description: 2.4 起的本機限定：機敏會議什麼都不送 GPT 或 Claude。何時用、兩種開法、會做什麼與不做什麼、local-only.json、被拒絕時的訊息（exit 6）、怎麼解除、與會議記錄校稿的關係、執行 log 的欄位。
+description: 2.4 起的本機限定：機敏會議什麼都不送 GPT 或 Claude。何時用、兩種開法、會做什麼與不做什麼、local-only.json、被拒絕時的訊息（exit 6）、怎麼解除、config.json 讀不了時也當成本機限定（2.4.1）、與會議記錄校稿的關係、執行 log 的欄位。
 ---
 
 # 本機限定（機敏會議）
@@ -49,7 +49,7 @@ description: 2.4 起的本機限定：機敏會議什麼都不送 GPT 或 Claude
 ### 小提醒
 
 - 右鍵入口裝好就有，兩個入口並列：「會議轉寫（Pro）」與「會議轉寫（Pro，本機限定）」（見[右鍵「傳送到」與拖放](/usage/send-to#本機限定的入口)）。
-- 全域設定只認 JSON 的 `true`（寫成 `"true"` 或 `1` 不算），避免打錯字卻以為開了。
+- 全域設定要寫 JSON 的 `true`（不加引號）。2.4.1 起，寫成 `"true"`、`1` 這類看不懂的值，或 `config.json` 整個讀不了時，也**當成本機限定**，畫面會寫原因（見 [config.json 讀不了或值看不懂](#config-unreadable)）；2.4.0 會當成沒開。
 - 全域設定不會在輸出資料夾寫標記檔：之後把全域設定關掉，舊的輸出資料夾也跟著恢復。
 - 用一般入口重新轉寫一份之前用本機限定轉過的錄音，輸出資料夾裡的標記檔還在，這一份仍是本機限定。
 
@@ -133,7 +133,8 @@ stdout 最後一行的 JSON（給程式讀的）：
 |---|---|
 | exit code | `6`（其他 exit code 的意思不變） |
 | `reason` | `local_only` |
-| `local_only_source` | `marker`（標記檔）、`config`（全域設定）、`config+marker`（兩者都有） |
+| `local_only_source` | `marker`（標記檔）、`config`（全域設定）、`config+marker`（兩者都有）；2.4.1 起另有 `config-unreadable`（`config.json` 讀不了或值看不懂，可能再加 `+marker`） |
+| `local_only_config_reason` | 2.4.1 起，來源是 `config-unreadable` 時才有：`bad_json`、`empty`、`not_utf8`、`not_object`、`permission`、`os_error`、`is_dir`、`bad_value` |
 
 被拒絕時，程式在找 `claude`／`codex` 之前就停下來：不讀逐字稿、不寫 `auto_correct.json`／`auto_minutes.json`，也不跑任何模型指令。
 
@@ -150,6 +151,41 @@ stdout 最後一行的 JSON（給程式讀的）：
 
 兩種都開著時，兩個都要做。解除之後，這一份就能照常做 [AI 校正與會議摘要](/features/ai-correction)（例如用 `auto_minutes.py "<檔名>_minutes"` 補做）。
 
+## config.json 讀不了或值看不懂（2.4.1） {#config-unreadable}
+
+`config.json` 讀不了的時候，程式沒辦法知道你有沒有開全域本機限定。2.4.1 起一律**當成本機限定**（寧可多擋，不外送）；2.4.0 會當成沒開、照常送出。
+
+| `config.json` 的狀態 | 全域 |
+|---|---|
+| 不存在 | 關 |
+| 讀得到，沒有 `privacy`，或 `privacy.local_only` 是 `false` | 關 |
+| `privacy.local_only` 是 `true` | 開 |
+| 存在但讀不了：沒有權限、被別的程式鎖住、不是 UTF-8、不是合法的 JSON（含開頭有 BOM）、空檔、最外層不是 `{ … }` | **開** |
+| `privacy` 不是 `{ … }`，或 `local_only` 是 `true`／`false` 以外的值（`"true"`、`1`、`null`…）；畫面的原因寫「值看不懂」 | **開** |
+
+常見的原因是手改 `config.json` 時多打或少打了一個逗號、引號，或用了會加 BOM 的編輯器存檔。
+
+**畫面**：右鍵（拖放）入口開頭的黃字寫出原因與恢復方法，接著照本機限定處理（不問 AI 校正與整理）：
+
+```text
+本機限定（config.json 讀不了：不是合法的 JSON（第 210 行第 1 欄）；為了不外送，已當成本機限定）：這次不會把任何資料送到 GPT 或 Claude；…
+要恢復：修好 %LOCALAPPDATA%\meeting-minutes-pro\config.json（存成 UTF-8 的 JSON 物件）；或刪掉它再重新執行安裝程式（重建的 config.json 本機限定是關）
+```
+
+值看不懂時寫「config.json 的值看不懂：privacy.local_only 是 "true"，只認得 true 或 false」。`auto_correct.py`、`auto_minutes.py` 一樣 exit 6，訊息是同樣的原因與恢復方法。
+
+**其他設定**：讀不了的時候，後端、詞表這些設定都用預設值（和 2.4.0 相同），轉寫開頭多一行警告：
+
+```text
+  [!] config.json 讀不了：不是合法的 JSON（第 210 行第 1 欄）：…\config.json。這次的設定都用預設值（暫以 openvino/CPU 執行），而且當成本機限定（不送 GPT 或 Claude）；請修好它，或刪掉後重新執行安裝程式
+```
+
+安裝時選的是 NVIDIA 或 Apple Silicon 的電腦，預設的 openvino/CPU 模型通常沒有下載，轉寫會停在「無法以 openvino/CPU 載入 Whisper」：先把 `config.json` 修好。
+
+**安裝程式不會蓋掉它**：安裝程式（與 `setup_backend.py`、`setup_gpu_diar.py`）遇到讀不了的 `config.json` 會在一開始就停下，什麼都不寫，檔案原封不動（2.4.0 會把整份設定洗掉、連本機限定一起改回 `false`）。見[安裝 › 安裝失敗怎麼辦](/install/#安裝失敗怎麼辦)。值看不懂的檔讀得到，安裝照常、值原樣保留。
+
+**恢復**：修好 `config.json`（UTF-8、JSON 物件，`privacy.local_only` 只寫 `true` 或 `false`），重新整理或重新執行就恢復；或刪掉它再重新執行安裝程式（重建的 `config.json` 本機限定是關，硬體會重新偵測）。只用本機限定的右鍵入口（標記檔）的那幾份不受這個問題影響。
+
 ## 沒有 AI 摘要，怎麼整理 {#no-ai-minutes}
 
 用附屬工具[會議記錄校稿](/features/proofread)（另外安裝）人工校稿：
@@ -158,7 +194,7 @@ stdout 最後一行的 JSON（給程式讀的）：
 2. 校完按「定稿…」，產生定稿逐字稿 `transcript.final.md` 與定稿字幕。
 3. 常錯的詞在「經驗整理」勾選後匯入對照表與詞表，**下次轉寫就會更準**。
 
-會議記錄校稿 1.1.0 認得本機限定：頁首檔名旁有「**本機限定**」標示，首頁清單在那一份旁也標示；「**用定稿重做會議記錄**」停用並寫明原因（那一步會把內容送給 AI）。人工修改、定稿、經驗匯入都照常。見[用會議記錄校稿確認逐字稿 › 本機限定的稿](/usage/proofread#本機限定的稿)。
+會議記錄校稿 1.1.0 起認得本機限定：頁首檔名旁有「**本機限定**」標示，首頁清單在那一份旁也標示；「**用定稿重做會議記錄**」停用並寫明原因（那一步會把內容送給 AI）。人工修改、定稿、經驗匯入都照常。1.1.1 起 Pro 的 `config.json` 讀不了或值看不懂時也一樣，首頁標題旁寫「本機限定（config.json 讀不了）」。見[用會議記錄校稿確認逐字稿 › 本機限定的稿](/usage/proofread#本機限定的稿)。
 
 ## 在 Claude 對話中
 
@@ -169,6 +205,7 @@ stdout 最後一行的 JSON（給程式讀的）：
 - 讀逐字稿**之前**先提醒你「在這個對話裡讀逐字稿＝送到 Anthropic 雲端」，**等你明確回答要繼續**才讀。
 - 不執行 `auto_correct.py`、`auto_minutes.py`，轉寫也不加 `--correct`。
 - 不替你刪標記檔或改設定。
+- 2.4.1 起用 `common.py local-only` 判定（`config.json` 讀不了也算本機限定）；這個判定本身失敗時，也照本機限定處理。
 - Claude 桌面 App 裡，檔案在你**附上的那一刻就已經送出**了；機敏會議的逐字稿請不要附到 App。
 
 機敏內容請不要在 Claude 對話中整理，改用上面的人工校稿。
@@ -179,7 +216,7 @@ stdout 最後一行的 JSON（給程式讀的）：
 
 | 位置 | 內容 |
 |---|---|
-| `run_log.jsonl` 的 `privacy` 事件 | `{"event": "privacy", "local_only": true, "local_only_source": "marker"}`：轉寫判定後，以及 AI 校正、整理被拒絕時各寫一筆 |
+| `run_log.jsonl` 的 `privacy` 事件 | `{"event": "privacy", "local_only": true, "local_only_source": "marker"}`：轉寫判定後，以及 AI 校正、整理被拒絕時各寫一筆。2.4.1 起來源是 `config-unreadable` 時另記 `config_reason`（原因代碼，不記路徑與內容） |
 | 被拒絕的步驟 | `result` 事件的 `status: skipped`、`reason: local_only`；沒有任何 `call`（模型呼叫）事件 |
 | `run_summary`、runtime 的 `logs/runs.jsonl` | 只在本機限定時多 `local_only: true`、`local_only_source` |
 

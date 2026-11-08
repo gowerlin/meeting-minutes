@@ -388,6 +388,42 @@ async function main () {
   rec('本機限定：首頁只有放了標記檔的那份標「本機限定」（標示與名稱間距 ≥ 4px）',
     loCards.some(c => c.lo) && loCards.every(c => c.lo === /^D3-/.test(c.name)) && tagGap >= 4,
     loCards.map(c => c.name + (c.lo ? '［本機限定］' : '')).join('｜') + `；間距 ${tagGap.toFixed(1)} px`)
+  // 〔1.1.1〕首頁卡片的提示字依來源寫（loTag()）：標記檔、全域設定、config.json 讀不了；頁首與說明列寫出 config 讀不了的原因
+  const cardTitles = async () => p4.$$eval('.card', es => es.map(e => ({ name: e.querySelector('.name span').textContent,
+    title: (e.querySelector('.tag.lo') || {}).title || '' })))
+  const headTag = async () => p4.$$eval('.home-head .tag.lo', es => es.map(e => ({ text: e.textContent, title: e.title })))
+  const cfgPath = path.join(work, 'home', 'config.json')
+  const cfgOrig = fs.readFileSync(cfgPath)
+  const t0 = await cardTitles()
+  const markerOnly = t0.filter(c => /^D3-/.test(c.name)).every(c => c.title === '這份不送 GPT 或 Claude（輸出資料夾有 local-only.json）')
+  fs.writeFileSync(cfgPath, '{"runtime_version": "2.2.0", "privacy": {"local_only": true}}')
+  await p4.reload(); await p4.waitForSelector('.card')
+  const t1 = await cardTitles(); const h1 = await headTag()
+  const globalOk = h1.length === 1 && h1[0].text === '本機限定（整部電腦）' &&
+    t1.filter(c => !/^D3-/.test(c.name)).every(c => c.title === '這份不送 GPT 或 Claude（meeting-minutes-pro 的 config.json 設了 privacy.local_only（整部電腦））') &&
+    t1.filter(c => /^D3-/.test(c.name)).every(c => /privacy\.local_only/.test(c.title) && /local-only\.json/.test(c.title))
+  fs.writeFileSync(cfgPath, '{"runtime_version": "2.2.0", "privacy": {"local_only": "true"}')
+  await p4.reload(); await p4.waitForSelector('.card')
+  const t2 = await cardTitles(); const h2 = await headTag()
+  await shot(p4, 'home-config-unreadable-1440-dark.png')
+  const cuOk = h2.length === 1 && h2[0].text === '本機限定（config.json 讀不了）' && /config\.json 讀不了：不是合法的 JSON/.test(h2[0].title) &&
+    t2.every(c => /config\.json 讀不了或值看不懂，為了不外送已當成本機限定（整部電腦）/.test(c.title)) &&
+    t2.filter(c => /^D3-/.test(c.name)).every(c => /local-only\.json/.test(c.title)) &&
+    t2.filter(c => !/^D3-/.test(c.name)).every(c => !/local-only\.json/.test(c.title))
+  rec('〔1.1.1〕首頁卡片提示字依來源：標記檔「輸出資料夾有 local-only.json」、全域設定「config.json 設了 privacy.local_only」（不再誤寫 local-only.json）、config.json 讀不了；標題旁標示',
+    markerOnly && globalOk && cuOk, `${t1.map(c => c.title).join('｜')}｜${h2.map(x => x.text).join('')}`)
+  const pCu = await ctx.newPage()
+  watch(pCu)
+  await pCu.goto(`http://127.0.0.1:${new URL(urls[0]).port}/d/${decodeURIComponent(urls[1]).match(/\/d\/([0-9a-f]{12})/)[1]}?attach=1`)
+  await pCu.waitForSelector('.top .tag.lo')
+  const cu = await pCu.evaluate(() => ({ title: document.querySelector('.top .tag.lo').title,
+    banner: [...document.querySelectorAll('.banner p')].map(p => p.textContent).join('｜') }))
+  await shot(pCu, 'local-only-config-unreadable-1440-dark.png', TOPBAR)
+  rec('〔1.1.1〕config.json 讀不了：頁首標示的說明寫原因與恢復方法、說明列寫「config.json 讀不了或值看不懂，為了不外送已當成本機限定」',
+    /config\.json 讀不了：不是合法的 JSON/.test(cu.title) && /為了不外送，已當成本機限定/.test(cu.title) && /修好 meeting-minutes-pro 的 config\.json/.test(cu.title) &&
+    /本機限定（meeting-minutes-pro 的 config\.json 讀不了或值看不懂，為了不外送已當成本機限定；/.test(cu.banner), cu.banner.slice(0, 120))
+  await pCu.close()
+  fs.writeFileSync(cfgPath, cfgOrig)
   await p4.close()
 
   // ---- 手機寬度：只讀

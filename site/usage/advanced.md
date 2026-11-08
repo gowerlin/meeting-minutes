@@ -101,7 +101,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 |---|---|---|
 | `punctuation.enabled`、`.paragraph_gap`、`.paragraph_max_chars` | `true`、`2.0`、`200` | 本機分段標點與分段門檻 |
 | `opencc_keep.enabled` | `true` | OpenCC 詞彙回復表 |
-| `privacy.local_only` | `false` | `true`＝整部電腦都[本機限定](/features/local-only)（2.4）：入口不問 AI，AI 校正與整理一律拒絕（exit 6）。只認 JSON 的 `true` |
+| `privacy.local_only` | `false` | `true`＝整部電腦都[本機限定](/features/local-only)（2.4）：入口不問 AI，AI 校正與整理一律拒絕（exit 6）。要寫 JSON 的 `true`（不加引號）；2.4.1 起寫成 `"true"`、`1`、`null` 這類值，或 `config.json` 讀不了時，也當成本機限定（見[config.json 讀不了或值看不懂](/features/local-only#config-unreadable)） |
 | `correction.enabled` | `false` | Claude CLI 對話與命令列的自動校正（入口每次都問，不看這個值） |
 | `correction.ask_default`、`minutes.ask_default` | `true` | 入口兩題按 Enter 的答案（`false`＝Enter 是「否」） |
 | `correction.provider`、`minutes.provider` | `auto` | `auto`／`claude`／`openai`；`auto` 時已登入的 `codex`（GPT）優先，否則 `claude`（Claude） |

@@ -29,6 +29,9 @@
   輸出資料夾已有 `local-only.json`；檢查不問 AI、轉寫帶 `--local-only`、結束畫面文字與檔案列、假 claude／codex 被呼叫 0 次
   （假 CLI 把每次呼叫記到 `FAKE_CLI_LOG`）。供應商名稱統一（GPT／Claude）：舊情境檢查的畫面字串在測 2.4.0 時自動換成新說法
   （`OpenAI gpt-6.1-sol`→`GPT gpt-6.1-sol`、`會送到 OpenAI`→`會送到 GPT（OpenAI）`、`會送到 Anthropic`→`會送到 Claude（Anthropic）`）。
+- 〔2.4.1〕v241_scenarios：`local_only_config_broken`（config.json 不是合法 JSON，選項 `config_raw` 原樣寫入）、
+  `local_only_config_badvalue`（`privacy.local_only: "true"`）：一般入口也當成本機限定，不問 AI、假 CLI 0 次，
+  黃字寫原因（`為了不外送，已當成本機限定`）與「要恢復：修好 …」，結束畫面的解除方法是「全部：修好 …」。
 
 用法：python entry_harness.py --work <暫存目錄> [--shell pwsh powershell bash] [--only 情境名 ...]
 """
@@ -63,6 +66,7 @@ V22 = _testenv.VER >= (2, 2, 0)          # 〔2.2.0〕參考資料
 # 〔2.3.0〕--hotwords 特殊字元（PowerShell 5.1 用 Native-Arg）。MMP_TEST_HOTWORDS_CONTROL=1：舊版也跑這個情境（對照組，預期 5.1 失敗）
 V23 = _testenv.VER >= (2, 3, 0) or os.environ.get("MMP_TEST_HOTWORDS_CONTROL") == "1"
 V24 = _testenv.VER >= (2, 4, 0)          # 〔2.4.0〕本機限定、供應商名稱 GPT／Claude
+V241 = _testenv.VER >= (2, 4, 1)         # 〔2.4.1〕config.json 讀不了或值看不懂也當成本機限定
 NAMES_24 = (("OpenAI gpt-6.1-sol", "GPT gpt-6.1-sol"), ("會送到 OpenAI", "會送到 GPT（OpenAI）"),
             ("會送到 Anthropic", "會送到 Claude（Anthropic）"), ("：OpenAI", "：GPT"))
 
@@ -300,7 +304,30 @@ def scenarios():
         out.update(v23_scenarios())
     if V24:
         out.update(v24_scenarios())
+    if V241:
+        out.update(v241_scenarios())
     return out
+
+
+def v241_scenarios():
+    """〔2.4.1〕config.json 讀不了（壞 JSON）或 privacy.local_only 的值看不懂（"true"）：一般入口也當成本機限定
+    （規格 2.4.1 §2、§3.4）。不問 AI、假 CLI 0 次、黃字寫原因與恢復方法、結束畫面的解除方法。答案同 v24（沒有 AI 的題目）。"""
+    no_ai = [("calls", ["transcribe"]), ("nocli",), ("notext", "要做 AI 校正嗎"), ("notext", "背景說明"),
+             ("notext", "在 Claude 中說"), ("notext", "會送到"), ("text", "本機限定：沒有送出任何資料（沒有 AI 校正，也沒有 AI 整理）。"),
+             ("text", "本機限定：不做 AI 校正與會議摘要，不會送出任何資料"), ("targ_not", "--local-only"), ("marker", False),
+             ("text", "==== 會議轉寫（Pro）　meeting-minutes-pro"), ("text", "為了不外送，已當成本機限定"),
+             ("text", "：這次不會把任何資料送到 GPT 或 Claude"), ("text", "要恢復：修好 "),
+             ("text", "要解除本機限定（之後才能用 AI 校正與整理）：全部：修好 "),
+             ("text", "或刪掉它再重新執行安裝程式（重建的 config.json 本機限定是關）"), ("notext", "privacy.local_only 改成 false")]
+    ans = ["", "", "", ""]
+    return {
+        "local_only_config_broken": (["claude", "codex"], 0, {}, None, ans, no_ai + [
+            ("text", "本機限定（config.json 讀不了：不是合法的 JSON（第 1 行第"), ("text", "存成 UTF-8 的 JSON 物件")],
+            {"config_raw": '{"backend": "openvino", "privacy": {"local_only": false},'}),
+        "local_only_config_badvalue": (["claude", "codex"], 0, {"privacy": {"local_only": "true"}}, None, ans, no_ai + [
+            ("text", 'config.json 的值看不懂：privacy.local_only 是 "true"，只認得 true 或 false'),
+            ("text", "privacy.local_only 只能是 true 或 false")]),
+    }
 
 
 def v24_scenarios():
@@ -599,6 +626,8 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
     opts = spec[6] if len(spec) > 6 else {}
     mmh = make_runtime(work)
     write_config(mmh, cfg)
+    if "config_raw" in opts:                              # 〔2.4.1〕讀不了的 config.json（原樣寫入）
+        (mmh / "config.json").write_text(opts["config_raw"], encoding="utf-8")
     if opts.get("templates"):                            # 〔2.0.0〕自訂範本
         (mmh / "templates").mkdir()
         for n, t in opts["templates"].items():

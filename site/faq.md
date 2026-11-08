@@ -99,6 +99,7 @@ description: 音檔會上傳嗎、機敏會議能不能完全不上雲、要不�
 | 候選硬體裡沒有 MLX（macOS） | 確認是 Apple Silicon Mac，且 Python 是 arm64 原生版（不是 Rosetta），再重新執行 `install.command` |
 | Breeze 安裝或轉換失敗 | 看 `install.log`；常見原因是連不到 `huggingface.co`／`pypi.org`，或磁碟空間不足。之後可以用 `setup_backend.py --breeze-only` 重試 |
 | GPU 說話者分離沒有裝好 | 看[原因表](/install/gpu#裝失敗也沒關係)，補完後執行 `install.cmd -GpuDiar` |
+| 安裝一開始就停下：「config.json 讀不了：…為了不覆寫你的設定…這次沒有寫入任何東西」 | 2.4.1 起，`config.json` 壞掉時安裝程式不會蓋掉它（以免連本機限定一起洗掉）。照畫面上的原因修好它（例如少了逗號、多了逗號、存成了 BOM），或刪掉它再重新執行安裝程式（會重新偵測硬體、本機限定是關）。見[本機限定 › config.json 讀不了或值看不懂](/features/local-only#config-unreadable) |
 
 ### 轉寫
 
@@ -107,7 +108,8 @@ description: 音檔會上傳嗎、機敏會議能不能完全不上雲、要不�
 | Windows 右鍵沒有「會議轉寫（Pro）」 | Windows 11 要先點「顯示其他選項」；還是沒有就重新執行 `install.cmd` |
 | 右鍵沒有「會議轉寫（Pro，本機限定）」 | 2.4.0 起才有：用 2.4.0 以上的安裝包重新執行 `install.cmd`（macOS `install.command`），升級時會自動建立 |
 | macOS 拖放後沒有反應 | 到「系統設定 → 隱私權與安全性 → 自動化」，允許「會議轉寫（Pro）」控制「終端機」 |
-| 轉寫時顯示「無法以 … 載入 Whisper」 | 硬體、驅動或系統變了，重新執行安裝程式重新偵測 |
+| 轉寫時顯示「無法以 … 載入 Whisper」 | 硬體、驅動或系統變了，重新執行安裝程式重新偵測。開頭同時寫「config.json 讀不了…這次的設定都用預設值」時，是 `config.json` 壞了、改用預設的 openvino/CPU：先修好 `config.json`（見下一列） |
+| 轉寫開頭寫「config.json 讀不了：…這次的設定都用預設值…而且當成本機限定」 | `config.json` 讀不了（2.4.1 起也當成本機限定）。照訊息修好它，或刪掉後重新執行安裝程式。見[本機限定 › config.json 讀不了或值看不懂](/features/local-only#config-unreadable) |
 | 輸出是簡體字 | 確認沒有加 `--no-opencc` |
 | 專有名詞一直錯 | 加到 [`glossary.txt`](/features/accuracy#專有名詞清單)；固定的錯法加到[對照表](/features/accuracy#固定錯誤對照表) |
 | 「權限」變「許可權」這類用詞被改掉 | 用 `opencc_keep.py test "句子"` 試，再把詞加到 `opencc_keep.tsv`（見 [OpenCC 詞彙回復表](/features/accuracy#opencc-詞彙回復表)） |
@@ -124,7 +126,8 @@ description: 音檔會上傳嗎、機敏會議能不能完全不上雲、要不�
 
 | 狀況 | 處理 |
 |---|---|
-| 入口沒有問「要做 AI 校正嗎？」 | 本機限定（從「會議轉寫（Pro，本機限定）」轉寫、輸出資料夾有 `local-only.json`，或 `privacy.local_only` 是 `true`）時不問，這是設計如此；否則是找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`，結束畫面會寫原因與安裝、登入方式 |
+| 入口沒有問「要做 AI 校正嗎？」 | 本機限定（從「會議轉寫（Pro，本機限定）」轉寫、輸出資料夾有 `local-only.json`、`privacy.local_only` 是 `true`，或 2.4.1 起 `config.json` 讀不了）時不問，這是設計如此；否則是找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`，結束畫面會寫原因與安裝、登入方式 |
+| 突然變成本機限定、AI 不送出：入口不問 AI，或結束碼 6，訊息寫「config.json 讀不了」或「config.json 的值看不懂」 | 2.4.1 起，`config.json` 讀不了（手改時打錯逗號或引號、存成 BOM、檔案被鎖住或沒有權限）或 `privacy.local_only` 寫成 `"true"`、`1` 這類值時，一律當成本機限定，以免把機敏會議送出去。照訊息寫的原因修好 `config.json`（`privacy.local_only` 只寫 `true` 或 `false`，不加引號），或刪掉它再重新執行安裝程式。見[本機限定 › config.json 讀不了或值看不懂](/features/local-only#config-unreadable) |
 | `auto_correct.py`／`auto_minutes.py` 結束碼 6，訊息「本機限定（…）：…已拒絕，沒有送出任何資料」 | 這一份是[本機限定](/features/local-only)，拒絕送出是設計如此、沒有旗標可以略過。確定可以送時才解除：刪除輸出資料夾裡的 `local-only.json`，或把 `config.json` 的 `privacy.local_only` 改回 `false`，再重新執行 |
 | 自動校正沒跑 | 看輸出資料夾 `auto_correct.json` 的 `reason`：`cli_not_found`＝找不到指令、`auth_failed`＝沒登入、`api_key_missing`＝API 通道沒設定金鑰；本機限定時不寫 `auto_correct.json`，看 `run_log.jsonl` 裡 `reason: local_only` 的事件 |
 | `auth_failed`（GPT） | 在終端機執行 `codex login` 登入；`codex login status` 可以確認（不耗額度） |

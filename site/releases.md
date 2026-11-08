@@ -13,6 +13,17 @@ description: meeting-minutes-pro 1.0.0 到最新版、基本版 meeting-minutes�
 
 ## meeting-minutes-pro（Pro 版）
 
+### 2.4.1
+
+2026-11-08 發布。**安全修正**，建議所有 2.4.0 的使用者升級（重新執行安裝程式即可，`config.json` 只更新版號）。
+
+- **`config.json` 讀不了時也當成本機限定**：2.4.0 遇到 `config.json` 讀不了（手改時打錯逗號或引號、不是 UTF-8、開頭有 BOM、空檔、最外層不是 `{ … }`、沒有權限或被鎖住），會當成「沒有開全域本機限定」而照常把內容送到 GPT 或 Claude；`privacy.local_only` 寫成 `"true"`（有引號）、`1`、`null` 時也一樣當成沒開。2.4.1 起這些情況一律**當成本機限定**：入口不問 AI，`auto_correct.py`、`auto_minutes.py` exit 6，畫面寫明原因、檔案路徑與恢復方法（見[本機限定 › config.json 讀不了或值看不懂](/features/local-only#config-unreadable)）。不存在時照舊不是本機限定。
+- **安裝程式不再蓋掉讀不了的 `config.json`**：2.4.0 重新安裝（或重新偵測硬體）時，會把讀不了的 `config.json` 整份換成預設值，連帶把 `privacy.local_only: true` 改回 `false`。2.4.1 起安裝程式、`setup_backend.py`、`setup_gpu_diar.py` 遇到讀不了的檔會停下、什麼都不寫，請修好或刪掉後重新執行。
+- 其他設定（後端、詞表等）在讀不了時照舊用預設值，轉寫開頭多印一行警告。執行 log、`runs.jsonl` 的本機限定來源多一種值 `config-unreadable`（欄位不變）。在 Claude 對話中，skill 改用同一個判定，判定失敗也照本機限定處理。
+- **影響範圍**：只有用**整部電腦的本機限定**（`config.json` 的 `privacy.local_only`）而且 `config.json` 讀不了或值寫錯的情況。用「會議轉寫（Pro，本機限定）」右鍵入口（標記檔 `local-only.json`）的那幾份不受影響。還沒升級前的做法：機敏會議改用本機限定的右鍵入口；或確認 `config.json` 用 UTF-8 存、`privacy.local_only` 寫 `true`（不加引號）。
+- 用 Claude 桌面 App 的人請改上傳新版的上傳檔。會議記錄校稿建議一起升到 1.1.1。
+- **已知限制**：macOS 的修正（安裝程式的檢查、拖放入口）沒有實機驗證。
+
 ### 2.4.0
 
 這一版加入**本機限定**：機敏會議可以完全不送雲端（[本機限定](/features/local-only)）。
@@ -150,6 +161,15 @@ description: meeting-minutes-pro 1.0.0 到最新版、基本版 meeting-minutes�
 - 第一版：本機轉寫（Whisper large-v3-turbo，安裝時自動選硬體）、說話者分離、影片截圖、繁體輸出、專有名詞提示、幻覺過濾，以及在 Claude 裡整理成會議記錄。
 
 ## 會議記錄校稿（附屬工具）
+
+### 1.1.1
+
+2026-11-08 發布。**安全修正**。需要 meeting-minutes-pro **2.2.0 以上**，建議 **2.4.1**。從 1.1.0 升級：重新執行新版的安裝程式（最近的稿清單與校稿進度都保留，存檔格式不變）。
+
+- **Pro 的 `config.json` 讀不了或值看不懂時也當成本機限定**（同 Pro 2.4.1）：1.1.0 會當成不是本機限定，「用定稿重做會議記錄」可以按（會送出內容）。1.1.1 起停用，頁首、說明列、重做的原因與首頁寫出原因、檔案路徑與恢復方法，首頁標題旁寫「本機限定（config.json 讀不了）」。
+- **首頁卡片的提示字**：只有整部電腦的本機限定、輸出資料夾沒有標記檔時，1.1.0 的滑鼠提示誤寫「輸出資料夾有 local-only.json」；1.1.1 依原因寫（整部電腦的設定、標記檔、config.json 讀不了）。
+- **影響範圍**：只有用 Pro 整部電腦的本機限定、而且 `config.json` 讀不了或值寫錯的情況；標記檔那幾份不受影響。
+- **已知限制**：macOS 的安裝與入口尚未在實機上驗證；視窗寬度小於 760px（手機）只能檢視；Claude 桌面 App 不能使用。
 
 ### 1.1.0
 

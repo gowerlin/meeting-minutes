@@ -765,6 +765,26 @@ class ProofreadInterface(unittest.TestCase):
             for n in names:
                 self.assertTrue(hasattr(m, n), f"{mod}.{n}")
 
+    def _load_config_behaves_like_220(self):
+        import common
+        home = Path(tempfile.mkdtemp(prefix="mmp-v241-lc-"))
+        saved = os.environ.get("MEETING_MINUTES_PRO_HOME")
+        os.environ["MEETING_MINUTES_PRO_HOME"] = str(home)
+        try:
+            self.assertEqual(common.load_config(), {})
+            cfg = {"backend": "ct2", "correction": {"enabled": True}, "privacy": {"local_only": False}}
+            (home / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+            self.assertEqual(common.load_config(), cfg)
+            for raw in (b"", b"{", b"\xff\xfe", b"\xef\xbb\xbf{}"):
+                (home / "config.json").write_bytes(raw)
+                self.assertEqual(common.load_config(), {}, raw)
+        finally:
+            if saved is None:
+                os.environ.pop("MEETING_MINUTES_PRO_HOME", None)
+            else:
+                os.environ["MEETING_MINUTES_PRO_HOME"] = saved
+            shutil.rmtree(home, ignore_errors=True)
+
     @unittest.skipUnless(V220.is_dir(), "沒有 meeting-minutes-pro-v2.2.0 目錄")
     def test_files_unchanged_from_220(self):
         old, new = V220 / "payload" / "runtime" / "scripts", _testenv.SCRIPTS
@@ -782,7 +802,13 @@ class ProofreadInterface(unittest.TestCase):
                     tree = ast.parse(text)
                     return {n.name: ast.get_source_segment(text, n) for n in tree.body if isinstance(n, ast.FunctionDef)}
                 fa, fb = funcs(chr(10).join(a)), funcs(chr(10).join(b))
-                for name in ("data_home", "load_config", "setting", "default_glossary", "corrections_path", "config_path"):
+                same = ("data_home", "load_config", "setting", "default_glossary", "corrections_path", "config_path")
+                if _testenv.VER >= (2, 4, 1):
+                    # 〔2.4.1〕load_config() 改成經 read_config()（規格 2.4.1 §2.1）：原始碼不同，校稿看到的行為相同——
+                    # 不存在 → {}、讀得到的物件 → 原內容、讀不了 → {}（另外由 local_only_state() 當成本機限定）
+                    same = tuple(n for n in same if n != "load_config")
+                    self._load_config_behaves_like_220()
+                for name in same:
                     self.assertEqual(fa[name], fb[name], name)
                 import importlib.util
 

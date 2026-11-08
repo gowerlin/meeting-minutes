@@ -136,6 +136,15 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
 - 安裝紀錄在 runtime 資料夾的 `install.log`（Windows：`%LOCALAPPDATA%\meeting-minutes-pro\install.log`；macOS：`~/Library/Application Support/meeting-minutes-pro/install.log`）。
 - 公司網路有 proxy 時，先設定 `HTTPS_PROXY` 環境變數再重新安裝。
 - 找不到 ffmpeg：開一個新的終端機（Windows 可能要登出再登入），讓系統路徑生效後重新執行安裝程式。
+- **一開始就停下，寫「config.json 讀不了」**（2.4.1 起）：`config.json` 壞掉時安裝程式不會蓋掉它，在選單之前就停下、什麼都不寫，以免把你的設定（包括[本機限定](/features/local-only#config-unreadable)）洗掉：
+
+  ```text
+  [錯誤] config.json 讀不了：不是合法的 JSON（第 210 行第 1 欄）：%LOCALAPPDATA%\meeting-minutes-pro\config.json
+  為了不覆寫你的設定（包括本機限定 privacy.local_only），這次沒有寫入任何東西，檔案沒有被改動。
+  請修好這個檔（UTF-8 的 JSON 物件，例如用記事本打開找出錯誤），或刪掉它，然後重新執行。…
+  ```
+
+  照原因修好後重新執行；或刪掉 `config.json` 再重新執行（會重新偵測硬體，本機限定是關）。
 - 其他狀況見[常見問題與疑難排解](/faq#疑難排解)。
 
 想用命令列一次指定所有選項（不顯示選單），見[手動執行與參數](/usage/advanced#安裝程式的參數)。

@@ -161,9 +161,15 @@ class Config(unittest.TestCase):
         self.assertIs(after["privacy"]["local_only"], False)
 
     def test_only_true_counts(self):
+        """只有 true 算全域本機限定。〔2.4.1〕true／false 以外的值改成「值看不懂」也當成本機限定（來源 config-unreadable，
+        規格 2.4.1 §2；2.4.0 當成關）；false 照舊是關。"""
         for v in ("true", 1, "yes", None, False):
             with self.subTest(v=v):
-                self.assertIsNone(common.local_only_state(None, {"privacy": {"local_only": v}}))
+                st = common.local_only_state(None, {"privacy": {"local_only": v}})
+                if _testenv.VER >= (2, 4, 1) and v is not False:
+                    self.assertEqual((st["source"], st["config_problem"]["reason"]), ("config-unreadable", "bad_value"))
+                else:
+                    self.assertIsNone(st)
 
 
 @unittest.skipUnless(V24, "2.4.0 才有")

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -543,17 +544,27 @@ class ProDetect(unittest.TestCase):
         self.assertFalse(P.version_ge("2.2.9", "2.3.0"))
 
     def test_local_only_state(self):
-        """〔1.1.0〕本機限定的判定：只看 $MMH/config.json 的 privacy.local_only 是 true 與輸出資料夾的 local-only.json。"""
+        """〔1.1.0〕本機限定的判定：$MMH/config.json 的 privacy.local_only 是 true 與輸出資料夾的 local-only.json。
+        〔1.1.1〕true／false 以外的值與壞掉的 config.json 改成「當成本機限定」（來源 config-unreadable；1.1.0 當成關）。"""
+        v111 = P.version_ge(M.TOOL_VERSION, "1.1.1")
         home, out = WORK / "lo-home", WORK / "lo-out"
         for d in (home, out):
             d.mkdir(exist_ok=True)
+        (out / "local-only.json").unlink(missing_ok=True)
         (home / "config.json").write_text(json.dumps({"runtime_version": "2.2.0"}), encoding="utf-8")
         self.assertIsNone(P.local_only_state(home, out))
         for v in ("true", 1, None, False):
             (home / "config.json").write_text(json.dumps({"privacy": {"local_only": v}}), encoding="utf-8")
-            self.assertIsNone(P.local_only_state(home, out), v)
+            if v111 and v is not False:
+                self.assertEqual(P.local_only_state(home, out)["source"], "config-unreadable", v)
+            else:
+                self.assertIsNone(P.local_only_state(home, out), v)
         (home / "config.json").write_text("{壞掉的 JSON", encoding="utf-8")
-        self.assertIsNone(P.local_only_state(home, out))
+        if v111:
+            self.assertEqual(P.local_only_state(home, out)["source"], "config-unreadable")
+        else:
+            self.assertIsNone(P.local_only_state(home, out))
+        (home / "config.json").write_text(json.dumps({"runtime_version": "2.2.0"}), encoding="utf-8")
         (out / "local-only.json").write_text("", encoding="utf-8")
         st = P.local_only_state(home, out)
         self.assertEqual((st["sources"], st["source"]), (["marker"], "marker"))
@@ -564,6 +575,106 @@ class ProDetect(unittest.TestCase):
         self.assertIn("privacy.local_only 改成 false", st["message"])
         self.assertIn("「用定稿重做」會送出內容，所以停用", st["message"])
         self.assertEqual(P.local_only_state(home, None)["sources"], ["config"])
+
+    # ---------------------------------------------------------------- 〔1.1.1〕config.json 讀不了或值看不懂
+    LO_UNREADABLE = [("empty", b"", "empty"), ("spaces", b" \r\n ", "empty"), ("bad_json", b'{"privacy": {"local_only": true},', "bad_json"),
+                     ("not_utf8", '{"x": "會議"}'.encode("cp950"), "not_utf8"), ("bom", b"\xef\xbb\xbf{}", "bad_json"),
+                     ("array", b"[{}]", "not_object"), ("null", b"null", "not_object")]
+    LO_BAD_VALUE = [{"privacy": True}, {"privacy": None}, {"privacy": {"local_only": "true"}}, {"privacy": {"local_only": 1}},
+                    {"privacy": {"local_only": None}}, {"privacy": {"local_only": "false"}}]
+    LO_OFF = [{}, {"runtime_version": "2.4.1"}, {"privacy": {}}, {"privacy": {"local_only": False}}]
+
+    def _lo_home(self, name):
+        home = WORK / f"lo111-{name}"
+        if home.exists():
+            shutil.rmtree(home)
+        home.mkdir(parents=True)
+        return home
+
+    @unittest.skipUnless(P.version_ge(M.TOOL_VERSION, "1.1.1"), "1.1.1 才有")
+    def test_v111_table(self):
+        """〔1.1.1〕判定表每一列（規格 1.1.1 §2，同 Pro 2.4.1）。"""
+        home = self._lo_home("table")
+        cfg = home / "config.json"
+        self.assertIsNone(P.local_only_state(home), "不存在：關")
+        self.assertEqual(P.read_pro_config(home)["status"], "missing")
+        for c in self.LO_OFF:
+            cfg.write_text(json.dumps(c), encoding="utf-8")
+            self.assertIsNone(P.local_only_state(home), c)
+        cfg.write_text(json.dumps({"privacy": {"local_only": True}}), encoding="utf-8")
+        self.assertEqual(P.local_only_state(home)["source"], "config")
+        for name, data, reason in self.LO_UNREADABLE:
+            with self.subTest(name):
+                cfg.write_bytes(data)
+                st = P.local_only_state(home)
+                self.assertEqual((st["source"], st["config_problem"]["reason"]), ("config-unreadable", reason))
+                for t in ("meeting-minutes-pro 的 config.json 讀不了", "為了不外送，已當成本機限定", "「用定稿重做」會送出內容，所以停用",
+                          "修好 meeting-minutes-pro 的 config.json", str(cfg), "或刪掉它再重新執行 meeting-minutes-pro 的安裝程式"):
+                    self.assertIn(t, st["message"])
+        for c in self.LO_BAD_VALUE:
+            with self.subTest(c):
+                cfg.write_text(json.dumps(c), encoding="utf-8")
+                st = P.local_only_state(home)
+                self.assertEqual((st["source"], st["config_problem"]["reason"]), ("config-unreadable", "bad_value"))
+                self.assertIn("meeting-minutes-pro 的 config.json 的值看不懂", st["message"])
+        cfg.unlink()
+        cfg.mkdir()
+        self.assertEqual(P.local_only_state(home)["config_problem"]["reason"], "is_dir")
+
+    @unittest.skipUnless(P.version_ge(M.TOOL_VERSION, "1.1.1"), "1.1.1 才有")
+    def test_v111_permission_and_oserror(self):
+        home = self._lo_home("perm")
+        cfg = home / "config.json"
+        cfg.write_text(json.dumps({"privacy": {"local_only": False}}), encoding="utf-8")
+        real = Path.read_bytes
+
+        def deny(p, *a, **k):
+            if Path(p) == cfg:
+                raise PermissionError(13, "Permission denied")
+            return real(p, *a, **k)
+        with mock.patch.object(Path, "read_bytes", deny):
+            st = P.local_only_state(home)
+        self.assertEqual((st["source"], st["config_problem"]["reason"]), ("config-unreadable", "permission"))
+        with mock.patch.object(Path, "read_bytes", side_effect=OSError(32, "The process cannot access the file")):
+            self.assertEqual(P.local_only_state(home)["config_problem"]["reason"], "os_error")
+        with mock.patch.object(Path, "read_bytes", side_effect=FileNotFoundError(2, "No such file")):
+            self.assertIsNone(P.local_only_state(home), "不存在照舊是關")
+
+    @unittest.skipUnless(P.version_ge(M.TOOL_VERSION, "1.1.1"), "1.1.1 才有")
+    def test_v111_marker_combo(self):
+        home, out = self._lo_home("combo"), WORK / "lo111-combo-out"
+        out.mkdir(exist_ok=True)
+        (out / P.LOCAL_ONLY_MARKER).write_text("", encoding="utf-8")
+        (home / "config.json").write_bytes(b"{")
+        st = P.local_only_state(home, out)
+        self.assertEqual((st["sources"], st["source"]), (["config-unreadable", "marker"], "config-unreadable+marker"))
+        self.assertIn("刪除輸出資料夾裡的 local-only.json", st["message"])
+
+    @unittest.skipUnless(P.version_ge(M.TOOL_VERSION, "1.1.1"), "1.1.1 才有")
+    def test_v111_same_as_pro(self):
+        """原因代碼與文字和 Pro（2.4.1 起）common.CONFIG_PROBLEM_TEXT 相同；同一批檔案兩邊判定一致（不 import Pro 的函式來判定）。"""
+        src = (H.PRO_SCRIPTS / "common.py").read_text(encoding="utf-8")
+        if H.locate.vtuple(H.PRO_VERSION) < (2, 4, 1):
+            self.skipTest("repo 內的 Pro 比 2.4.1 舊")
+        import ast
+        tree = ast.parse(src)
+        pro_text = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
+                        and any(getattr(t, "id", None) == "CONFIG_PROBLEM_TEXT" for t in n.targets))
+        self.assertEqual(P.CONFIG_PROBLEM_TEXT, pro_text)
+        code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import common; st = common.local_only_state(); "
+                "print(json.dumps(st and [st['source'], (st.get('config_problem') or {}).get('reason')]))")
+        home = self._lo_home("vs-pro")
+        cases = [d for _, d, _ in self.LO_UNREADABLE] + [json.dumps(c).encode() for c in self.LO_BAD_VALUE + self.LO_OFF] + [
+            json.dumps({"privacy": {"local_only": True}}).encode()]
+        for data in cases:
+            with self.subTest(data=data[:40]):
+                (home / "config.json").write_bytes(data)
+                r = subprocess.run([sys.executable, "-B", "-c", code, str(H.PRO_SCRIPTS)], capture_output=True, text=True,
+                                   encoding="utf-8", env=dict(os.environ, MEETING_MINUTES_PRO_HOME=str(home), PYTHONDONTWRITEBYTECODE="1"))
+                pro = json.loads(r.stdout)
+                mine = P.local_only_state(home)
+                mine = mine and [mine["source"], (mine.get("config_problem") or {}).get("reason")]
+                self.assertEqual(mine, pro)
 
     def test_marker_name_matches_pro(self):
         """標記檔名與 Pro（2.4.0 起）common.LOCAL_ONLY_MARKER 相同；repo 內的 Pro 比 2.4.0 舊時只比對常數本身。"""

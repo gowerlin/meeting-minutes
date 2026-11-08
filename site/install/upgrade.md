@@ -52,6 +52,8 @@ description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2、從 2.2 升級到 2
 3. **Claude 桌面 App 請改上傳新版的上傳檔**（桌面上的 zip 已換成新版）。
 4. **會議記錄校稿建議一起升到 <MmVersion product="proofread" />**：才認得本機限定（舊版在本機限定的那一份按「重做」時會被 Pro 拒絕，不會送出，見[安裝會議記錄校稿 › 升級](/install/proofread#升級)）。
 
+2.4.0 → 2.4.1（安全修正）：重新執行安裝程式即可，`config.json` 只更新 `runtime_version`。改變的地方：`config.json` 讀不了或 `privacy.local_only` 的值看不懂時，改成**當成本機限定**（2.4.0 會照常送出）；安裝程式遇到讀不了的 `config.json` 會停下、不再把它蓋掉（見[本機限定 › config.json 讀不了或值看不懂](/features/local-only#config-unreadable)）。Claude 桌面 App 請改上傳新版的上傳檔；會議記錄校稿建議一起升到 <MmVersion product="proofread" />。
+
 從 2.0.x 直接升到 <MmVersion /> 也只要重新執行一次安裝程式，上面各段的改變都會一起套用。
 
 會議記錄校稿的升級另外執行它自己的安裝程式，見[安裝會議記錄校稿 › 升級](/install/proofread#升級)。
