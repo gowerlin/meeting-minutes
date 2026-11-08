@@ -503,9 +503,10 @@ def check_cli(home: Path, scripts: Path, python_ok=True) -> tuple:
 
 
 class ProDetect(unittest.TestCase):
-    def test_real_pro_220_passes(self):
+    def test_real_pro_passes(self):
+        """repo 內最新的 Pro（〔1.1.0〕不寫死 2.2.0）通過相容檢查。"""
         code, res = check_cli(HOME, H.PRO_SCRIPTS)
-        self.assertEqual((code, res["code"], res["version"]), (0, "ok", "2.2.0"))
+        self.assertEqual((code, res["code"], res["version"]), (0, "ok", H.PRO_VERSION))
 
     def test_no_pro(self):
         empty = WORK / "no-pro-home"
@@ -535,10 +536,41 @@ class ProDetect(unittest.TestCase):
         self.assertIn("subtitles.recue", res["missing"])
 
     def test_redo_gate(self):
-        self.assertFalse(PRO.redo_available)
+        # 〔1.1.0〕repo 內的 Pro 取最新版：重做是否可用依實際版號
+        self.assertEqual(PRO.redo_available, H.locate.vtuple(H.PRO_VERSION) >= (2, 3, 0))
         self.assertTrue(P.version_ge("2.3.0", P.REDO_MIN_PRO))
         self.assertTrue(P.version_ge("2.10.1", "2.3.0"))
         self.assertFalse(P.version_ge("2.2.9", "2.3.0"))
+
+    def test_local_only_state(self):
+        """〔1.1.0〕本機限定的判定：只看 $MMH/config.json 的 privacy.local_only 是 true 與輸出資料夾的 local-only.json。"""
+        home, out = WORK / "lo-home", WORK / "lo-out"
+        for d in (home, out):
+            d.mkdir(exist_ok=True)
+        (home / "config.json").write_text(json.dumps({"runtime_version": "2.2.0"}), encoding="utf-8")
+        self.assertIsNone(P.local_only_state(home, out))
+        for v in ("true", 1, None, False):
+            (home / "config.json").write_text(json.dumps({"privacy": {"local_only": v}}), encoding="utf-8")
+            self.assertIsNone(P.local_only_state(home, out), v)
+        (home / "config.json").write_text("{壞掉的 JSON", encoding="utf-8")
+        self.assertIsNone(P.local_only_state(home, out))
+        (out / "local-only.json").write_text("", encoding="utf-8")
+        st = P.local_only_state(home, out)
+        self.assertEqual((st["sources"], st["source"]), (["marker"], "marker"))
+        self.assertIn("刪除輸出資料夾裡的 local-only.json", st["message"])
+        (home / "config.json").write_text(json.dumps({"privacy": {"local_only": True}}), encoding="utf-8")
+        st = P.local_only_state(home, out)
+        self.assertEqual(st["source"], "config+marker")
+        self.assertIn("privacy.local_only 改成 false", st["message"])
+        self.assertIn("「用定稿重做」會送出內容，所以停用", st["message"])
+        self.assertEqual(P.local_only_state(home, None)["sources"], ["config"])
+
+    def test_marker_name_matches_pro(self):
+        """標記檔名與 Pro（2.4.0 起）common.LOCAL_ONLY_MARKER 相同；repo 內的 Pro 比 2.4.0 舊時只比對常數本身。"""
+        self.assertEqual(P.LOCAL_ONLY_MARKER, "local-only.json")
+        src = (H.PRO_SCRIPTS / "common.py").read_text(encoding="utf-8")
+        if H.locate.vtuple(H.PRO_VERSION) >= (2, 4, 0):
+            self.assertIn(f'LOCAL_ONLY_MARKER = "{P.LOCAL_ONLY_MARKER}"', src)
 
     def test_no_pycache_in_pro(self):
         self.assertEqual(list(H.PRO_SCRIPTS.rglob("__pycache__")), [])

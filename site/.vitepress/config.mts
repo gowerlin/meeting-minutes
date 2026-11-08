@@ -122,6 +122,7 @@ const sidebar: DefaultTheme.Sidebar = {
       text: '功能',
       items: [
         { text: '總覽', link: '/features/' },
+        { text: '本機限定（機敏會議）', link: '/features/local-only' },
         { text: '7 種內容類型', link: '/features/content-types' },
         { text: '自訂範本', link: '/features/custom-templates' },
         { text: '字幕', link: '/features/subtitles' },

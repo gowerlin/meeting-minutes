@@ -95,6 +95,8 @@ const EXPECTED = [
   ['docs/spec/meeting-minutes-pro-2.2-spec.md', '2.2 公開版規格（參考資料、全文用字統一）'],
   ['docs/spec/meeting-minutes-pro-2.3-spec.md', '2.3 公開版規格（配合會議記錄校稿）'],
   ['docs/spec/meeting-minutes-proofread-1.0-spec.md', '會議記錄校稿 1.0 公開版規格'],
+  ['docs/spec/meeting-minutes-pro-2.4-spec.md', '2.4 公開版規格（本機限定）'],
+  ['docs/spec/meeting-minutes-proofread-1.1-spec.md', '會議記錄校稿 1.1 公開版規格（認得本機限定）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.cmd', '會議記錄校稿（Windows 入口）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.ps1', '會議記錄校稿（Windows 安裝）'],
   ['proofread/meeting-minutes-proofread-v{PROOF}/install.sh', '會議記錄校稿（macOS 安裝）'],
@@ -109,6 +111,7 @@ const EXPECTED = [
   ['site/install/proofread.md', 'Portal：安裝會議記錄校稿'],
   ['site/features/proofread.md', 'Portal：會議記錄校稿功能頁'],
   ['site/usage/proofread.md', 'Portal：會議記錄校稿使用方法'],
+  ['site/features/local-only.md', 'Portal：本機限定（機敏會議）'],
   ['site/package.json', 'S1-e'],
   ['site/index.md', 'S1-e']
 ]

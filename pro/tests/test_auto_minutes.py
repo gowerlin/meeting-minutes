@@ -1290,7 +1290,8 @@ class RefsRun(Base):
         self.use(fake)
         res, console = capture(self.run_am)
         self.assertEqual(res["status"], "ok", res)
-        self.assertIn("逐字稿文字、會議文件 1 份的名詞與段落、背景說明、校正時整理的參考資料（不含截圖）會送到 Anthropic", console)
+        self.assertIn("逐字稿文字、會議文件 1 份的名詞與段落、背景說明、校正時整理的參考資料（不含截圖）會送到 " + _testenv.vendor("claude"),
+                      console)
         self.assertIn("講者對應：S2：摘要寫 王志明、截圖對應 林家豪，採截圖", console)
         c = fake.calls[0]
         self.assertEqual(c["system"], am.meeting_system("single", with_refs=True))

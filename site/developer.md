@@ -59,16 +59,14 @@ runtime、skill、右鍵捷徑（或 `.app`）、桌面上傳檔都改放到 `<�
 ### 會議記錄校稿的測試
 
 ```bash
-MMPROOF_TEST_PRO_SCRIPTS=pro/meeting-minutes-pro-v<版號>/payload/runtime/scripts python -B proofread/tests/run_tests.py --only unit,server,dist,browser
+python -B proofread/tests/run_tests.py
 ```
 
-- `MMPROOF_TEST_PRO_SCRIPTS` 指向 Pro 的 `scripts`：會議記錄校稿要用 Pro 的模組讀寫標記、字幕與對照表，測試用 repo 裡的 Pro 程式，不碰你真正的安裝。
-- 群組：單元、整合（不開瀏覽器）、打包、瀏覽器（Playwright＋本機 Chrome），另有安裝與移除（沙盒）。沒有 Playwright 時拿掉 `browser`。
+- 會議記錄校稿要用 Pro 的模組讀寫標記、字幕與對照表，測試自動使用 repo 裡 `pro/` 的 Pro 最新版（唯讀），不碰你真正的安裝。要指定別的 Pro：環境變數 `MMPROOF_TEST_PRO_SCRIPTS` 指向 Pro 的 `scripts`。
+- 以舊版 Pro（2.2.x）為前提的情境，測試會從最新版複製一份、只改版號的假 Pro 來測，所以公開 repo 只有最新版也能全部跑。
+- 群組：單元、整合（不開瀏覽器）、安裝與移除（沙盒；Windows 另需 PowerShell 7、Windows PowerShell 5.1 與 Git Bash，缺的 shell 略過並列出）、打包、瀏覽器（Playwright＋本機 Chrome 與 Edge）。沒有 Playwright 時加 `--no-browser`；只跑某幾組用 `--only unit,server`。
+- 打包群組的「git 執行權限位元」只在開發用的 repo 檢查，公開 repo 會略過（公開 repo 的 `.sh`、`.command` 在 git 裡已設成可執行，clone 下來就能直接執行）。
 - 測試只在系統暫存區建假的 Pro 資料夾，不會動你的 `corrections.tsv`、`glossary.txt`。
-- **在公開 repo 跑時，下面幾項會失敗，屬預期**（開發時用完整的版本目錄都跑過，結果見公開版規格附錄 B）：
-  - 以 Pro 2.2.x 為前提的 4 項（偵測 Pro 2.2.0 的版本、Pro 2.2.x 時「用定稿重做」停用）：公開 repo 只有 Pro 最新版。
-  - 安裝與移除群組：要用 Pro 2.2.0 與最新版的版本目錄建沙盒，公開 repo 沒有舊版目錄，所以上面的指令沒有列它。
-  - 打包群組的「git 執行權限位元」1 項：公開 repo 裡的腳本是 100644；發行用的 zip 由打包工具設定權限，不受影響。
 
 ## 重建合成素材
 

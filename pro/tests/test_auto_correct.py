@@ -771,7 +771,7 @@ class Run(Base):
         self.assertEqual(res["status"], "ok")
         line = next(l for l in err.getvalue().splitlines() if "預估" in l)
         # 〔1.2.2〕「1 塊」→「分 1 段」
-        self.assertIn(("分 1 段" if _testenv.VER >= (1, 2, 2) else "1 塊") + "，預估約 1 分鐘；逐字稿文字會送到 Anthropic", line)
+        self.assertIn(("分 1 段" if _testenv.VER >= (1, 2, 2) else "1 塊") + "，預估約 1 分鐘；逐字稿文字會送到 " + _testenv.vendor("claude"), line)
         self.assertIsNone(re.search(r"(\d+)～\1 分鐘", line))
 
     def test_api_auto_only_anthropic_key_records_fallback(self):
@@ -1505,7 +1505,7 @@ class RefsRun(RefsBase):
             res = ac.run(self.out, ac.resolve_request(cfg), cfg=cfg, consent=True)
         self.assertEqual((res["status"], ac.exit_code(res)), ("ok", 0), res)
         console = err.getvalue()
-        self.assertIn("逐字稿文字、截圖 3 張、會議文件 1 份的名詞與段落、背景說明會送到 Anthropic", console)
+        self.assertIn("逐字稿文字、截圖 3 張、會議文件 1 份的名詞與段落、背景說明會送到 " + _testenv.vendor("claude"), console)
         self.assertIn("參考資料：截圖 3 張、與會者 3 位、講者對應 2 個", console)
         # correct.refs：一次、附 3 張圖、圖在呼叫時存在、呼叫後暫存資料夾已刪
         rc = fake.refs_calls()

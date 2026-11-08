@@ -1,6 +1,6 @@
 ---
 title: 常見問題與疑難排解
-description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy，以及常見狀況的處理方式。
+description: 音檔會上傳嗎、機敏會議能不能完全不上雲、要不要付費、準確度與限制、proxy，以及常見狀況的處理方式。
 ---
 
 # 常見問題與疑難排解
@@ -13,7 +13,22 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 
 不會。語音辨識、說話者分離、分段標點都在你的電腦上完成，音檔一律不送。你選擇做 AI 校正或會議摘要時，**逐字稿文字**會送到你選的 GPT（OpenAI）或 Claude（Anthropic）。2.2 起，AI 校正另外會送**影片截圖**（最多 8 張，縮小後），以及你放的背景說明與會議文件的名詞和段落；會議摘要不送截圖。每次送出前都會先問你，詢問行寫明這次要送什麼。不想送截圖：`config.json` 的 `reference.frames` 改成 `false`。詳見 [AI 校正與會議摘要](/features/ai-correction#送出去的是什麼)與[參考資料](/features/reference)。
 
-在 Claude 裡整理（Claude Code、Claude 桌面 App，基本版的整理也是）時，你附上或讓 Claude 讀取的逐字稿與截圖會送到 Anthropic 的雲端由 Claude 處理；音檔不會送出。對話中沒有「要送出嗎？」這一步，有機敏內容時請不要在對話中讀逐字稿。
+在 Claude 裡整理（Claude Code、Claude 桌面 App，基本版的整理也是）時，你附上或讓 Claude 讀取的逐字稿與截圖會送到 Anthropic 的雲端由 Claude 處理；音檔不會送出。對話中沒有「要送出嗎？」這一步，有機敏內容時請不要在對話中讀逐字稿，改用[本機限定](/features/local-only)。
+
+### 機敏會議可以完全不上雲嗎？
+
+可以，用[本機限定](/features/local-only)（Pro 2.4.0 起）：
+
+- **這一份**：對錄音檔按右鍵 →「傳送到」→「**會議轉寫（Pro，本機限定）**」（macOS 拖到「會議轉寫（Pro，本機限定）」）。輸出資料夾會多一個 `local-only.json`。
+- **整部電腦**：`config.json` 的 `privacy.local_only` 改成 `true`。
+
+本機限定時轉寫、字幕、網頁版照常，**不問** AI 校正與會議摘要，之後誰要送都會被拒絕（exit 6）。沒有 AI 摘要，要整理就用[會議記錄校稿](/features/proofread)人工校稿，常錯的詞匯入對照表後下次更準。
+
+另外記得：在 Claude 對話（Claude Code、Claude 桌面 App）裡讀逐字稿，本身就會送到 Anthropic 的雲端。skill 遇到本機限定會先問你，但機敏內容最好不要在對話中整理。
+
+### 為什麼沒有「這次送出」的旗標？
+
+刻意的。本機限定是**拒絕，而不是提醒**：旗標可能在趕時間、複製別人的指令、或讓 AI 代為執行時被加上去，而機敏內容送出一次就收不回來。要解除只能自己動手：這一份刪掉輸出資料夾裡的 `local-only.json`，全部則把 `privacy.local_only` 改回 `false`（見[怎麼解除](/features/local-only#怎麼解除)）。
 
 ### 要付費嗎？
 
@@ -90,6 +105,7 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 | 狀況 | 處理 |
 |---|---|
 | Windows 右鍵沒有「會議轉寫（Pro）」 | Windows 11 要先點「顯示其他選項」；還是沒有就重新執行 `install.cmd` |
+| 右鍵沒有「會議轉寫（Pro，本機限定）」 | 2.4.0 起才有：用 2.4.0 以上的安裝包重新執行 `install.cmd`（macOS `install.command`），升級時會自動建立 |
 | macOS 拖放後沒有反應 | 到「系統設定 → 隱私權與安全性 → 自動化」，允許「會議轉寫（Pro）」控制「終端機」 |
 | 轉寫時顯示「無法以 … 載入 Whisper」 | 硬體、驅動或系統變了，重新執行安裝程式重新偵測 |
 | 輸出是簡體字 | 確認沒有加 `--no-opencc` |
@@ -108,8 +124,9 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 
 | 狀況 | 處理 |
 |---|---|
-| 入口沒有問「要做 AI 校正嗎？」 | 找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`；結束畫面會寫原因與安裝、登入方式 |
-| 自動校正沒跑 | 看輸出資料夾 `auto_correct.json` 的 `reason`：`cli_not_found`＝找不到指令、`auth_failed`＝沒登入、`api_key_missing`＝API 通道沒設定金鑰 |
+| 入口沒有問「要做 AI 校正嗎？」 | 本機限定（從「會議轉寫（Pro，本機限定）」轉寫、輸出資料夾有 `local-only.json`，或 `privacy.local_only` 是 `true`）時不問，這是設計如此；否則是找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`，結束畫面會寫原因與安裝、登入方式 |
+| `auto_correct.py`／`auto_minutes.py` 結束碼 6，訊息「本機限定（…）：…已拒絕，沒有送出任何資料」 | 這一份是[本機限定](/features/local-only)，拒絕送出是設計如此、沒有旗標可以略過。確定可以送時才解除：刪除輸出資料夾裡的 `local-only.json`，或把 `config.json` 的 `privacy.local_only` 改回 `false`，再重新執行 |
+| 自動校正沒跑 | 看輸出資料夾 `auto_correct.json` 的 `reason`：`cli_not_found`＝找不到指令、`auth_failed`＝沒登入、`api_key_missing`＝API 通道沒設定金鑰；本機限定時不寫 `auto_correct.json`，看 `run_log.jsonl` 裡 `reason: local_only` 的事件 |
 | `auth_failed`（GPT） | 在終端機執行 `codex login` 登入；`codex login status` 可以確認（不耗額度） |
 | `auth_failed`（Claude） | 在終端機執行 `claude`，輸入 `/login` 登入，再用 `auto_correct.py` 補做 |
 | 會議摘要沒跑或不完整 | 看 `auto_minutes.json` 的 `reason` 與 `parts`；修好後 `auto_minutes.py "<檔名>_minutes" --force` |

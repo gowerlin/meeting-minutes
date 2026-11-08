@@ -58,6 +58,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `--no-opencc`、`--no-opencc-keep` | 不做簡繁轉換；不套用 OpenCC 詞彙回復表 |
 | `--no-punct`、`--paragraph-gap SEC`、`--paragraph-max-chars N` | 關閉分段標點；停頓幾秒換段（預設 2.0）；滿幾字換段（預設 200） |
 | `--no-cues` | 這次不產生 `transcript.cues.srt` |
+| `--local-only` | [本機限定](/features/local-only)（2.4）：在輸出資料夾寫入標記檔 `local-only.json`，這一份之後的 AI 校正與整理一律拒絕（exit 6）。沒有反過來「這次送出」的旗標 |
 | `--correct`／`--no-correct` | 這次開／關自動校正（`--correct` 代表你同意送出逐字稿文字與[參考資料](/features/reference)） |
 | `--claude`／`--openai` | 這次用 Claude（Anthropic）／GPT（OpenAI）自動校正 |
 | `--correct-model M`、`--correct-effort E`、`--correct-channel cli\|api` | 這次的模型、推理強度、通道 |
@@ -100,6 +101,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 |---|---|---|
 | `punctuation.enabled`、`.paragraph_gap`、`.paragraph_max_chars` | `true`、`2.0`、`200` | 本機分段標點與分段門檻 |
 | `opencc_keep.enabled` | `true` | OpenCC 詞彙回復表 |
+| `privacy.local_only` | `false` | `true`＝整部電腦都[本機限定](/features/local-only)（2.4）：入口不問 AI，AI 校正與整理一律拒絕（exit 6）。只認 JSON 的 `true` |
 | `correction.enabled` | `false` | Claude CLI 對話與命令列的自動校正（入口每次都問，不看這個值） |
 | `correction.ask_default`、`minutes.ask_default` | `true` | 入口兩題按 Enter 的答案（`false`＝Enter 是「否」） |
 | `correction.provider`、`minutes.provider` | `auto` | `auto`／`claude`／`openai`；`auto` 時已登入的 `codex`（GPT）優先，否則 `claude`（Claude） |

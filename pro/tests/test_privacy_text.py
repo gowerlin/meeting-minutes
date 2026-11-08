@@ -53,7 +53,9 @@ class PrivacyText(unittest.TestCase):
         def read(rel):
             return (VD / rel).read_text(encoding="utf-8-sig")
         skill = read("payload/skill/meeting-minutes-pro/SKILL.md")
-        self.assertIn("做自動校正時，逐字稿文字、影片截圖（最多 8 張，縮小後）、背景說明與會議文件的名詞和相關段落會送到使用者選的供應商", skill)
+        # 〔2.4.0〕「使用者選的供應商」改成「使用者選的 AI（GPT（OpenAI）或 Claude（Anthropic））」
+        self.assertIn("做自動校正時，逐字稿文字、影片截圖（最多 8 張，縮小後）、背景說明與會議文件的名詞和相關段落會送到使用者選的"
+                      + (" AI（GPT（OpenAI）或 Claude（Anthropic））" if _testenv.V24 else "供應商"), skill)
         self.assertIn("做會議摘要時送逐字稿文字、背景說明與文件的名詞和段落（摘要不送截圖）。音檔與文件原檔都不上傳", skill)
         self.assertIn("代表使用者已同意送出逐字稿與參考資料", skill)
         self.assertIn("**逐字稿模式（Claude App 沙盒）的參考資料（2.2）**", skill)               # §10

@@ -448,6 +448,7 @@ def _snippet_sh() -> str:
 V2_KEYS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] if _testenv.VER >= (2, 0, 0) else []
 V2_KEYS += ["html"] if _testenv.VER >= (2, 1, 0) else []      # 〔2.1.0〕upgrade_config() 另補 html 區塊（規格 2.1.0 §6.1）
 V2_KEYS += ["reference", "consistency"] if _testenv.VER >= (2, 2, 0) else []  # 〔2.2.0〕另補 reference 區塊（規格 2.2.0 §8.1）與 consistency（全文用字統一）
+V2_KEYS += _testenv.V24_BLOCKS                                   # 〔2.4.0〕另補 privacy 區塊（本機限定）
 
 
 @unittest.skipUnless(V122, "1.2.2 才有")

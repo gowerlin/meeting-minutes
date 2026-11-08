@@ -87,7 +87,7 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
 | 選項 | 白話說明 |
 |---|---|
 | **1** | 你平常用 Claude Code（終端機裡的 `claude`，或 Claude 桌面版的「Code」分頁）。Claude 會自己幫你轉寫、整理。 |
-| **2** | 你平常用 Claude 桌面 App 的對話。安裝程式會在檔案總管加上右鍵「傳送到 → 會議轉寫（Pro）」（macOS 是「應用程式」裡的「會議轉寫（Pro）」），並在桌面放一份要上傳到 App 的 zip。 |
+| **2** | 你平常用 Claude 桌面 App 的對話。安裝程式會在檔案總管加上右鍵「傳送到 → 會議轉寫（Pro）」與機敏會議用的「會議轉寫（Pro，本機限定）」（macOS 是「應用程式」裡的這兩個 app），並在桌面放一份要上傳到 App 的 zip。 |
 | **3** | 兩種都裝。不確定就選這個。 |
 | **4** | 解除安裝（見[升級與解除安裝](/install/upgrade#解除安裝)）。 |
 
@@ -100,19 +100,29 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
      自動校正（選用）
      - 偵測：claude CLI 已找到…
      - 偵測：codex CLI  已找到…，登入：是（ChatGPT 帳號）
-     - 將使用：OpenAI（gpt-6.1-sol，透過 Codex）。開啟後，逐字稿文字與影片截圖會送到 OpenAI（音檔不會；要關掉截圖：config 的 reference.frames 改成 false）
+     - 將使用：GPT（gpt-6.1-sol，透過 Codex）。開啟後，逐字稿文字與影片截圖會送到 GPT（OpenAI）（音檔不會；要關掉截圖：config 的 reference.frames 改成 false）
      是否開啟自動校正？[y/N]
    ```
+
+   沒有已登入的 `codex`、改用 Claude 時，這一行是「將使用：Claude（opus）。開啟後，逐字稿文字與影片截圖會送到 Claude（Anthropic）（…）」。
 
 3. **有 NVIDIA 顯示卡時**：要不要安裝 GPU 說話者分離（預設不裝）。說明見 [GPU 說話者分離（選用）](/install/gpu)。
 
 ## 安裝完成以後
 
-安裝摘要會列出選定的硬體、裝了哪些模型與功能。接下來：
+安裝摘要會列出選定的硬體、裝了哪些模型與功能。2.4 起另有一行本機限定的狀態：
+
+```text
+    本機限定：關（機敏會議用右鍵「會議轉寫（Pro，本機限定）」；整部電腦都不送雲端：config.json 的 privacy.local_only 改成 true）
+```
+
+整部電腦開了本機限定時寫「本機限定：開（…）」（見[本機限定](/features/local-only)）。升級時這個設定會保留：從 2.3 升級會補上 `privacy` 這一組設定（預設 `false`，畫面寫「config.json 已補上新版設定鍵：privacy（既有的值不變）」），你改過的值不會被蓋掉。
+
+接下來：
 
 - **選了 1 或 3（Claude CLI）**：skill 已經放進 Claude Code，直接跟 Claude 說「用 meeting-minutes-pro 整理 …」就可以（見 [Claude CLI](/usage/cli)）。
 - **選了 2 或 3（Claude App）**：
-  1. 在 Windows 檔案總管對錄音檔按右鍵，會看到「傳送到 → 會議轉寫（Pro）」；macOS 的「應用程式」裡會有「會議轉寫（Pro）」（見[右鍵「傳送到」與拖放](/usage/send-to)）。
+  1. 在 Windows 檔案總管對錄音檔按右鍵，會看到「傳送到 → 會議轉寫（Pro）」與「會議轉寫（Pro，本機限定）」；macOS 的「應用程式」裡會有這兩個 app（見[右鍵「傳送到」與拖放](/usage/send-to)；本機限定給機敏會議用，見[本機限定](/features/local-only)）。
   2. 桌面上多了 `meeting-minutes-pro-skill-upload.zip`。到 Claude App 依序點「**自訂（Customize）** →「**Skills**」→「**＋**」→「**Create skill**」→「**Upload a skill**」，上傳這個 zip（**不要解開**）。
   3. App 要先在「設定 → Capabilities」開啟程式碼執行功能。
 - **想在瀏覽器裡逐處確認 AI 校正的結果**：另外安裝附屬工具[會議記錄校稿](/install/proofread)（選用，需要 Pro <MmVersion product="proofread-min-pro" /> 以上）。

@@ -301,5 +301,7 @@ if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] == ["--long"]:
         print(make_long(Path(a[1])))
+    elif a[:1] == ["--fake-pro"]:                          # 〔1.1.0〕瀏覽器測試用：--fake-pro <真的 scripts> <目的> <版號>
+        print(make_fake_pro(Path(a[1]), Path(a[2]), version=a[3]))
     else:
         print(make_all(Path(a[0])))

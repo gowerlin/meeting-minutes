@@ -17,6 +17,7 @@
 | 7 種內容類型（會議、課程、訪談、操作教學、座談、工作坊、需求訪談）、自訂範本 | — | ✅ |
 | 字幕、網頁版、GPU 說話者分離（選用）、執行 log 與費用 | — | ✅ |
 | AI 校正參考影片截圖與會議文件、全文用字統一 | — | ✅ |
+| 本機限定：機敏會議什麼都不送 GPT 或 Claude（2.4） | — | ✅ |
 | 下載 | [Releases（basic-v…）](https://github.com/gowerlin/meeting-minutes/releases) | [Releases（pro-v…，Latest）](https://github.com/gowerlin/meeting-minutes/releases/latest) |
 | 說明 | [基本版](https://gowerlin.github.io/meeting-minutes/basic) | [功能總覽](https://gowerlin.github.io/meeting-minutes/features/) |
 
@@ -35,7 +36,7 @@ Pro 的附屬工具，另外下載：在瀏覽器裡逐處確認 AI 校正的結
 2. **完整解壓縮**。
 3. Windows 雙擊 `install.cmd`；macOS 先裝 [Homebrew](https://brew.sh)，再對 `install.command` 按右鍵 →「打開」。
 4. 在選單選 `[3] 兩者都裝`，照畫面回答（都可以直接按 Enter），等 5～15 分鐘。
-5. 對錄音檔按右鍵 →「傳送到」→「會議轉寫（Pro）」（macOS：把檔案拖到「會議轉寫（Pro）」）。
+5. 對錄音檔按右鍵 →「傳送到」→「會議轉寫（Pro）」（macOS：把檔案拖到「會議轉寫（Pro）」）。機敏會議改用「會議轉寫（Pro，本機限定）」：這一份什麼都不送雲端。
 
 詳細步驟：[安裝](https://gowerlin.github.io/meeting-minutes/install/)。只用 Claude 桌面 App 的人，另外上傳 `…-claude-app-upload.zip`（不要解開）。
 
@@ -44,9 +45,10 @@ Pro 的附屬工具，另外下載：在瀏覽器裡逐處確認 AI 校正的結
 - 語音辨識、說話者分離、分段標點都在本機完成，音檔不會上傳。
 - 選用的 AI 校正與會議摘要會把**逐字稿文字**送到你選的 AI（GPT 或 Claude），每次都會先問、寫明要送什麼。
 - Pro 2.2 起，AI 校正另外送**影片截圖**（最多 8 張，縮小後）與你放的背景說明、會議文件的名詞和段落；會議摘要不送截圖；文件原檔不送。截圖可以在設定裡關掉（`reference.frames`）。
-- 在 Claude 裡整理（Claude Code、Claude 桌面 App；基本版的整理也是）：你附上或讓 Claude 讀取的逐字稿與截圖會送到 Anthropic 的雲端由 Claude 處理；音檔不會送出。對話中沒有「要送出嗎？」這一步，有機敏內容時請不要在對話中讀逐字稿。
+- 在 Claude 裡整理（Claude Code、Claude 桌面 App；基本版的整理也是）：你附上或讓 Claude 讀取的逐字稿與截圖會送到 Anthropic 的雲端由 Claude 處理；音檔不會送出。對話中沒有「要送出嗎？」這一步，有機敏內容時請不要在對話中讀逐字稿，改用本機限定。
+- **本機限定**（Pro 2.4 起）：從「會議轉寫（Pro，本機限定）」轉寫的那一份，或 `config.json` 的 `privacy.local_only` 設成 `true` 時，什麼都不送 GPT 或 Claude：入口不問 AI，AI 校正與整理一律拒絕（exit 6），沒有旗標可以略過；要整理就用會議記錄校稿人工校稿。見[本機限定](https://gowerlin.github.io/meeting-minutes/features/local-only)。
 - 不記錄逐字稿內容、金鑰與帳號資訊。
-- 會議記錄校稿只接受本機連線、不載入外部資源；只有選用的「用定稿重做會議記錄」會把定稿逐字稿送到 Pro 設定的供應商，而且先顯示預估費用、確認才送。
+- 會議記錄校稿只接受本機連線、不載入外部資源；只有選用的「用定稿重做會議記錄」會把定稿逐字稿送到 Pro 設定的供應商，而且先顯示預估費用、確認才送；本機限定的那一份這一步停用。
 
 ## 文件
 
@@ -71,7 +73,7 @@ site/                              說明網站（VitePress）
 - 跑測試：`cd pro/tests && python -B -m unittest -v`（見 [`pro/tests/README.md`](pro/tests/README.md)）。
 - 合成素材：repo 只放講稿，音檔用 `pro/tests/make_materials.py` 重建（需要網路、edge-tts 與 ffmpeg）。
 - 打包：`python pro/tools/make_dist.py`。
-- 會議記錄校稿：`MMPROOF_TEST_PRO_SCRIPTS=pro/meeting-minutes-pro-v<版號>/payload/runtime/scripts python -B proofread/tests/run_tests.py --only unit,server,dist,browser`（瀏覽器測試要 Playwright 與本機 Chrome；公開 repo 只有 Pro 最新版，有幾項以 Pro 2.2.x 為前提的測試會失敗，見 [給開發者](https://gowerlin.github.io/meeting-minutes/developer)）、打包 `python -B proofread/tools/make_dist.py`。
+- 會議記錄校稿：`python -B proofread/tests/run_tests.py`（自動使用 `pro/` 裡的 Pro 最新版；瀏覽器測試要 Playwright 與本機 Chrome、Edge）、打包 `python -B proofread/tools/make_dist.py`。
 - 網站：`cd site && npm ci && npm run build`。
 - 詳見 [給開發者](https://gowerlin.github.io/meeting-minutes/developer)。
 

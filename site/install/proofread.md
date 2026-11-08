@@ -17,6 +17,7 @@ description: 會議記錄校稿是 meeting-minutes-pro 的附屬工具。這頁�
 
 - 需要 **meeting-minutes-pro <MmVersion product="proofread-min-pro" /> 以上**，而且是用 Pro 的安裝程式裝在這部電腦上。
 - 「用定稿重做會議記錄」這個選用功能需要 Pro **2.3.0 以上**；其他功能在 Pro 2.2.x 上都能用。
+- 建議搭配 Pro **<MmVersion />**：會議記錄校稿 1.1.0 認得 Pro 2.4 的[本機限定](/features/local-only)（機敏會議），在那一份停用會送出內容的「用定稿重做」。
 - 怎麼看 Pro 的版本：對錄音檔按右鍵轉寫時，視窗第一行會印「meeting-minutes-pro 2.x.x」；或看 [更版紀錄](/releases) 對照你下載的安裝包檔名。
 - 還沒裝 Pro：先到[安裝](/install/)，裝好再回來。
 
@@ -30,9 +31,9 @@ description: 會議記錄校稿是 meeting-minutes-pro 的附屬工具。這頁�
 
 ```text
 ==> 檢查 meeting-minutes-pro
-    [OK] meeting-minutes-pro 2.3.0（最低 2.2.0；介面檢查通過）
+    [OK] meeting-minutes-pro 2.4.0（最低 2.2.0；介面檢查通過）
 
-==> 安裝會議記錄校稿 1.0.0 到 %LOCALAPPDATA%\meeting-minutes-pro\proofread
+==> 安裝會議記錄校稿 1.1.0 到 %LOCALAPPDATA%\meeting-minutes-pro\proofread
 
 ==> 建立右鍵「傳送到 → 會議記錄校稿」
     [OK] 對會議的輸出資料夾（<檔名>_minutes）按右鍵 → 傳送到 → 會議記錄校稿
@@ -40,7 +41,7 @@ description: 會議記錄校稿是 meeting-minutes-pro 的附屬工具。這頁�
 ==> 建立「會議記錄校稿.mmproof」的雙擊開啟
     [OK] 第一次開啟某份稿後，輸出資料夾裡會出現「會議記錄校稿.mmproof」，之後雙擊它就能接著校
 
-==> 安裝完成（會議記錄校稿 1.0.0，搭配 meeting-minutes-pro 2.3.0）
+==> 安裝完成（會議記錄校稿 1.1.0，搭配 meeting-minutes-pro 2.4.0）
 ```
 
 裝好後多了兩件事：
@@ -66,7 +67,8 @@ macOS 的安裝程式與入口照 Windows 版的流程寫好，也在測試環�
 **重新執行新版的安裝程式就是升級。**
 
 - 正在校稿的分頁會先自動存檔，服務關閉後換成新版程式。
-- 最近的稿清單、每份稿的校稿進度（各輸出資料夾的 `.proofread`）都保留，下次開啟接著校。
+- 最近的稿清單、每份稿的校稿進度（各輸出資料夾的 `.proofread`）都保留，下次開啟接著校。升級時畫面會多一行「[OK] 已升級（最近的稿清單與各輸出資料夾的校稿進度都保留）」。
+- 1.0.0 → 1.1.0：存檔格式不變（1.0.0 也開得起 1.1.0 存的稿），只多了[本機限定](/usage/proofread#本機限定的稿)的標示與重做停用。
 
 **Pro 升級之後**，會議記錄校稿還在：Pro 的安裝程式不會動 `proofread` 資料夾，右鍵與 `.mmproof` 繼續有效。每次開啟都會重新檢查與 Pro 的相容性，不相容時會提示到這頁下載相容的版本。Pro 重建了 Python 環境而且位置改變時，請重新執行會議記錄校稿的安裝程式。
 
@@ -88,9 +90,13 @@ macOS 的安裝程式與入口照 Windows 版的流程寫好，也在測試環�
 
 ## 版本相容表
 
-| 會議記錄校稿 | Pro 最低版本 | Pro 建議版本 | 「用定稿重做會議記錄」 |
+| 會議記錄校稿 | Pro 2.2.x | Pro 2.3.0 | Pro 2.4.0 |
 |---|---|---|---|
-| <MmVersion product="proofread" />（目前版本） | <MmVersion product="proofread-min-pro" /> | 2.3.0 | 需要 Pro 2.3.0 以上；Pro 2.2.x 時按鈕停用 |
+| <MmVersion product="proofread" />（目前版本） | 可用；「用定稿重做」停用；認得本機限定的標記檔 | 可用；本機限定的那一份「用定稿重做」停用 | 全部可用；本機限定的那一份「用定稿重做」停用 |
+| 1.0.0 | 可用；「用定稿重做」停用 | 全部可用 | 可用；不認得本機限定（本機限定的那一份按「用定稿重做」時會被 Pro 拒絕，不會送出） |
+
+- 最低版本：Pro <MmVersion product="proofread-min-pro" />；建議版本：Pro <MmVersion />。
+- 「用定稿重做會議記錄」需要 Pro 2.3.0 以上，而且這一份不是[本機限定](/features/local-only)。
 
 安裝程式與每次開啟都會檢查 Pro 的版本與它的介面（標記格式、會用到的 Pro 模組）。不相容時會停下並提示，不會用錯的格式寫檔。之後 Pro 改了標記格式時，更版紀錄會寫明哪一版的會議記錄校稿可以用。
 

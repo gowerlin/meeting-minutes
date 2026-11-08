@@ -773,6 +773,36 @@ class ProofreadInterface(unittest.TestCase):
         for f, key in (("common.py", "VERSION = "), ("render_html.py", "FALLBACK_VERSION = ")):
             a = (old / f).read_text(encoding="utf-8").splitlines()
             b = (new / f).read_text(encoding="utf-8").splitlines()
+            if f == "common.py" and _testenv.V24:
+                # 〔2.4.0〕common.py 有新增（privacy 區塊、本機限定函式），校稿用到的介面不變：介面函式的原始碼逐字相同，
+                # 2.2.0 DEFAULTS 的每個鍵與值都還在（runtime_version 除外）
+                import ast
+
+                def funcs(text):
+                    tree = ast.parse(text)
+                    return {n.name: ast.get_source_segment(text, n) for n in tree.body if isinstance(n, ast.FunctionDef)}
+                fa, fb = funcs(chr(10).join(a)), funcs(chr(10).join(b))
+                for name in ("data_home", "load_config", "setting", "default_glossary", "corrections_path", "config_path"):
+                    self.assertEqual(fa[name], fb[name], name)
+                import importlib.util
+
+                def defaults(path):
+                    spec = importlib.util.spec_from_file_location(f"c{abs(hash(str(path)))}", path)
+                    m = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(m)
+                    return m.DEFAULTS
+
+                def subset(x, y, at=""):
+                    for k, v in x.items():
+                        if at + k == "runtime_version":
+                            continue
+                        self.assertIn(k, y, at + k)
+                        if isinstance(v, dict):
+                            subset(v, y[k], at + k + ".")
+                        else:
+                            self.assertEqual(v, y[k], at + k)
+                subset(defaults(old / f), defaults(new / f))
+                continue
             self.assertEqual(len(a), len(b), f)
             diff = [(x, y) for x, y in zip(a, b) if x != y]
             self.assertEqual(len(diff), 1, (f, diff))

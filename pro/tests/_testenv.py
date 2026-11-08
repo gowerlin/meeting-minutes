@@ -31,6 +31,18 @@ VERSION = os.environ.get("MMP_TEST_VERSION") or latest_version()   # 〔2.3.0〕
 VER = tuple(int(x) for x in VERSION.split("."))
 # 〔1.2.2〕console 與輸出檔的分段單位：1.2.2 起「段」（「17 塊」在台灣易誤讀成 17 元），1.2.1 以前「塊」
 CHUNK_UNIT = "段" if VER >= (1, 2, 2) else "塊"
+# 〔2.4.0〕畫面上「會送到 …」的供應商名稱：2.4.0 起 GPT（OpenAI）／Claude（Anthropic），以前 OpenAI／Anthropic
+V24 = VER >= (2, 4, 0)
+
+
+def vendor(provider: str) -> str:
+    if V24:
+        return {"claude": "Claude（Anthropic）", "openai": "GPT（OpenAI）"}[provider]
+    return {"claude": "Anthropic", "openai": "OpenAI"}[provider]
+
+
+# 〔2.4.0〕upgrade_config() 另補的區塊（本機限定 privacy）
+V24_BLOCKS = ["privacy"] if V24 else []
 VERSION_DIR = HERE.parent / f"meeting-minutes-pro-v{VERSION}"
 SCRIPTS = VERSION_DIR / "payload" / "runtime" / "scripts"
 RUNTIME = SCRIPTS.parent

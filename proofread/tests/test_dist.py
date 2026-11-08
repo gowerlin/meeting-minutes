@@ -15,7 +15,11 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
-VDIR = ROOT / "meeting-minutes-proofread-v1.0.0"
+sys.path.insert(0, str(TESTS))
+import locate  # noqa: E402
+
+VDIR = locate.VDIR                       # 〔1.1.0〕最新的版本目錄（不寫死版號）
+TV = locate.TOOL_VERSION
 spec = importlib.util.spec_from_file_location("make_dist", ROOT / "tools" / "make_dist.py")
 D = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(D)
@@ -29,11 +33,11 @@ class MakeDist(unittest.TestCase):
         cls.r = D.make(None, str(cls.out))
 
     def test_files_and_root(self):
-        name = "meeting-minutes-proofread-v1.0.0-installer.zip"
+        name = f"{VDIR.name}-installer.zip"
         self.assertEqual(self.r["installer"].name, name)
         with zipfile.ZipFile(self.r["installer"]) as zf:
             names = sorted(n for n in zf.namelist() if not n.endswith("/"))
-            self.assertEqual(names, sorted("meeting-minutes-proofread-v1.0.0/" + f for f in D.REQUIRED))
+            self.assertEqual(names, sorted(f"{VDIR.name}/" + f for f in D.REQUIRED))
             for info in zf.infolist():
                 mode = (info.external_attr >> 16) & 0o777
                 want = 0o755 if info.filename.endswith((".sh", ".command")) else 0o644
@@ -52,7 +56,7 @@ class MakeDist(unittest.TestCase):
         p = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "make_dist.py"), "--out-dir", str(out)],
                            capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("版號 1.0.0", p.stdout)
+        self.assertIn(f"版號 {TV}", p.stdout)
         self.assertEqual((out / self.r["installer"].name).read_bytes(), self.r["installer"].read_bytes(),
                          "同樣的工作目錄產生同樣的安裝包")
 
@@ -70,8 +74,8 @@ class Checks(unittest.TestCase):
     def test_version_mismatch(self):
         v = copy_vdir(self.tmp)
         p = v / "install.sh"
-        p.write_bytes(p.read_bytes().replace(b'VERSION="1.0.0"', b'VERSION="1.0.1"'))
-        with self.assertRaisesRegex(D.DistError, "install.sh VERSION 1.0.1"):
+        p.write_bytes(p.read_bytes().replace(f'VERSION="{TV}"'.encode(), b'VERSION="9.0.1"'))
+        with self.assertRaisesRegex(D.DistError, "install.sh VERSION 9.0.1"):
             D.read_version(v)
 
     def test_dir_name_mismatch(self):
@@ -125,6 +129,7 @@ class RepoAttributes(unittest.TestCase):
             out = subprocess.run(["git", "-C", str(VDIR), "check-attr", "eol", "--", name], capture_output=True, text=True).stdout
             self.assertTrue(out.strip().endswith(f"eol: {want}"), out)
 
+    @unittest.skipUnless(locate.IS_DEV_REPO, "只在開發 repo 檢查（公開 repo 由匯出程式負責執行權限）")
     def test_exec_bit_in_index(self):
         out = subprocess.run(["git", "-C", str(VDIR), "ls-files", "-s", "--", "install.sh", "install.command", "uninstall.sh",
                               "uninstall.command"], capture_output=True, text=True).stdout.splitlines()

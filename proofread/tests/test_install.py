@@ -21,12 +21,16 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
-VDIR = ROOT / "meeting-minutes-proofread-v1.0.0"
+sys.path.insert(0, str(TESTS))
+import locate  # noqa: E402
+
+VDIR = locate.VDIR                       # 〔1.1.0〕最新的版本目錄；Pro 取 repo 內最新的版本目錄（開發 repo 或公開 repo 的 pro/）
 APP = VDIR / "payload" / "app"
 SKILLS = ROOT.parent
-PRO_SKILL = SKILLS / "meeting-minutes-pro-skill"
-PRO22_SCRIPTS = PRO_SKILL / "meeting-minutes-pro-v2.2.0" / "payload" / "runtime" / "scripts"
-PRO23 = PRO_SKILL / "meeting-minutes-pro-v2.3.0"
+PRO_SCRIPTS = locate.PRO_SCRIPTS         # 沙盒裡的假 $MMH 從這裡複製 scripts，再改成要測的版號
+# Pro 的解除安裝連動（Pro ≥ 2.3.0 才有）：用 repo 內最新版 Pro 的安裝程式；沒有 ≥ 2.3.0 的版本目錄時略過
+PRO_UNINST = locate.PRO_DIR if locate.vtuple(locate.PRO_VERSION) >= (2, 3, 0) else None
+PRO_UNINST_SKIP = f"repo 內的 meeting-minutes-pro 是 {locate.PRO_VERSION}，沒有 2.3.0 以上的版本目錄（解除安裝連動從 2.3.0 開始）"
 IS_WIN = sys.platform == "win32"
 TOOL = "會議記錄校稿"
 QUIET_KEPT = "保留最近的稿清單（安靜模式，不詢問）"
@@ -79,10 +83,10 @@ def make_sandbox(name: str, pro: str = "2.2.0", break_mark: bool = False, venv: 
     if pro is None:
         return root
     home = root / "home"
-    shutil.copytree(PRO22_SCRIPTS, home / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(PRO_SCRIPTS, home / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
     (home / "config.json").write_text(json.dumps({"runtime_version": pro}), encoding="utf-8")
     common = home / "scripts" / "common.py"
-    if pro != "2.2.0":
+    if True:                             # 〔1.1.0〕scripts 取自最新的 Pro，一律改成要測的版號
         s = common.read_text(encoding="utf-8")
         common.write_text(re.sub(r'^VERSION\s*=\s*"[^"]+"', f'VERSION = "{pro}"', s, count=1, flags=re.M), encoding="utf-8")
     if break_mark:
@@ -297,7 +301,7 @@ class _PsBase:
         dst = home / "proofread"
         self.assertEqual(tree_bytes(dst / "app"), payload_tree(), "app/ 要與安裝包的 payload/app 逐位元相同")
         vj = json.loads((dst / "version.json").read_text(encoding="utf-8"))   # 不能有 BOM
-        self.assertEqual((vj["version"], vj["pro_version_at_install"]), ("1.0.0", "2.2.0"))
+        self.assertEqual((vj["version"], vj["pro_version_at_install"]), (locate.TOOL_VERSION, "2.2.0"))
         self.assertRegex(vj["installed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$")
         for u in ("uninstall.ps1", "uninstall.sh"):
             self.assertEqual((dst / u).read_bytes(), (VDIR / u).read_bytes())
@@ -409,14 +413,14 @@ class _PsBase:
         self.assertEqual(r.returncode, 0, out_of(r))
         self.assertIn(f"沒有安裝 {TOOL}", r.stdout)
 
-    @unittest.skipUnless((PRO23 / "install.ps1").is_file(), "repo 內沒有 meeting-minutes-pro 2.3.0")
+    @unittest.skipUnless(PRO_UNINST and (PRO_UNINST / "install.ps1").is_file(), PRO_UNINST_SKIP)
     def test_pro230_uninstall_calls_quiet(self):
         """Pro 2.3.0 的解除安裝（測試模式）以 -Quiet 呼叫本工具的移除程式：不詢問、保留最近的稿清單。"""
         root = self.sandbox()
         self.assertEqual(self.install(root).returncode, 0)
         (root / "home" / "proofread" / "state" / "recent.json").write_text("[]", encoding="utf-8")
         (root / "skills" / "meeting-minutes-pro").mkdir(parents=True)
-        r = run_ps(self.shell, PRO23 / "install.ps1", "-Uninstall", "-TestRoot", root, stdin="n\n")   # n：Pro 問的「刪除 runtime」
+        r = run_ps(self.shell, PRO_UNINST / "install.ps1", "-Uninstall", "-TestRoot", root, stdin="n\n")   # n：Pro 問的「刪除 runtime」
         self.assertEqual(r.returncode, 0, out_of(r))
         self.assertIn("已移除會議記錄校稿", r.stdout)
         self.assertIn(QUIET_KEPT, r.stdout)
@@ -437,7 +441,7 @@ class InstallWinPs51(_PsBase, unittest.TestCase):
 # ------------------------------------------------------------------ Git Bash（install.sh／uninstall.sh）
 def pro_sh_functions() -> str:
     """Pro 2.3.0 install.sh 的 step／ok／warn／fail 與 uninstall_proofread、do_uninstall（install.sh 在 macOS 以外一開始就停止，所以只取函式）。"""
-    s = (PRO23 / "install.sh").read_text(encoding="utf-8")
+    s = (PRO_UNINST / "install.sh").read_text(encoding="utf-8")
     helpers = re.search(r"^c_cyan=.*?^fail\(\) \{.*?\n", s, re.S | re.M).group(0)
     funcs = re.search(r"^uninstall_proofread\(\) \{.*?\n\}\n\ndo_uninstall\(\) \{.*?\n\}\n", s, re.S | re.M).group(0)
     return helpers + funcs
@@ -493,7 +497,7 @@ class InstallGitBash(unittest.TestCase):
         dst = home / "proofread"
         self.assertEqual(tree_bytes(dst / "app"), payload_tree())
         vj = json.loads((dst / "version.json").read_text(encoding="utf-8"))
-        self.assertEqual((vj["version"], vj["pro_version_at_install"]), ("1.0.0", "2.2.0"))
+        self.assertEqual((vj["version"], vj["pro_version_at_install"]), (locate.TOOL_VERSION, "2.2.0"))
         self.assertRegex(vj["installed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$")
         self.assertEqual((dst / "uninstall.sh").read_bytes(), (VDIR / "uninstall.sh").read_bytes())
         script = (root / "Applications" / f"{TOOL}.app" / "Contents" / "mmproof-applescript.txt").read_text(encoding="utf-8")
@@ -558,7 +562,7 @@ class InstallGitBash(unittest.TestCase):
         self.assert_removed(root, state_kept=False)
         self.assertFalse((root / "home" / "proofread").exists())
 
-    @unittest.skipUnless((PRO23 / "install.sh").is_file(), "repo 內沒有 meeting-minutes-pro 2.3.0")
+    @unittest.skipUnless(PRO_UNINST and (PRO_UNINST / "install.sh").is_file(), PRO_UNINST_SKIP)
     def test_pro230_uninstall_calls_quiet(self):
         root = self.sandbox()
         self.assertEqual(self.install(root).returncode, 0)
@@ -578,7 +582,7 @@ class InstallGitBash(unittest.TestCase):
 class NoBytecode(unittest.TestCase):
     def test_zz_no_pycache_left(self):
         """repo 內的 Pro 2.2.0 scripts 與本工具版本目錄都沒有 __pycache__（全部測試跑完後檢查）。"""
-        self.assertFalse(list(PRO22_SCRIPTS.rglob("__pycache__")))
+        self.assertFalse(list(PRO_SCRIPTS.rglob("__pycache__")))
         self.assertFalse(list(VDIR.rglob("__pycache__")))
 
 

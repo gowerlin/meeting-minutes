@@ -13,6 +13,23 @@ description: meeting-minutes-pro 1.0.0 到最新版、基本版 meeting-minutes�
 
 ## meeting-minutes-pro（Pro 版）
 
+### 2.4.0
+
+這一版加入**本機限定**：機敏會議可以完全不送雲端（[本機限定](/features/local-only)）。
+
+- **本機限定（機敏會議）**：兩種開法，任一成立就是本機限定。
+  - **每份會議**：新的右鍵入口「**會議轉寫（Pro，本機限定）**」（macOS 是同名的 app）。從這裡轉寫的輸出資料夾會寫入標記檔 `local-only.json`，之後這一份的每一步都照本機限定處理。命令列是 `transcribe.py --local-only`。
+  - **整部電腦**：`config.json` 的 `privacy.local_only` 改成 `true`。
+  - 本機限定時，轉寫、字幕、網頁版、全文用字統一照常；入口**不問** AI 校正與整理（也不偵測 `claude`／`codex`），結束畫面寫「本機限定：沒有送出任何資料」並提示用會議記錄校稿人工校稿。
+  - `auto_correct.py`、`auto_minutes.py`、`transcribe.py --correct` **拒絕送出**：exit 6、`reason: local_only`，訊息寫明為什麼與怎麼解除。**沒有任何旗標可以略過**：要解除只能刪標記檔或改設定。
+  - [執行 log](/features/run-log) 多記 `privacy` 事件；本機限定時摘要多 `local_only`、`local_only_source` 兩欄（其他時候與 2.3.0 相同）。
+  - 在 Claude 對話中，skill 遇到本機限定時，讀逐字稿之前會先提醒「在對話中讀逐字稿＝送到 Anthropic 雲端」並等你明確答應；不執行 AI 校正與整理的程式。
+- **畫面上的供應商名稱改成 GPT／Claude**（GPT 在前）：例「AI 校正：GPT gpt-6.1-sol（…）；逐字稿文字會送到 GPT（OpenAI）」「[Enter] 預設（GPT gpt-6.1-sol）」，安裝程式寫「將使用：GPT（gpt-6.1-sol，透過 Codex）」。帳號、金鑰名、設定值（`openai`、`claude`）、旗標（`--openai`、`--claude`）照舊；輸出檔的表頭格式也不變（例「自動整理：OpenAI gpt-6.1-sol low，…」）。
+- **說清楚 Claude 對話會上雲**：README 與 skill 改寫成「在 Claude 對話（Claude Code、Claude 桌面 App）中讀到的逐字稿與截圖會送到 Anthropic 雲端處理；對話中讀檔前沒有另外的送出確認；音檔不上傳」。
+- **安裝程式**：建立與移除第二個右鍵入口（macOS 第二個 app）；安裝摘要多一行「本機限定：開／關」；升級時 `config.json` 補上 `privacy` 這一組設定（預設 `false`，你改過的值保留）。
+- 從 2.3.x 升級只要重新執行安裝程式；詞表、對照表、GPU 與精度設定都保留。用 Claude 桌面 App 的人請改上傳新版的上傳檔。會議記錄校稿建議一起升到 1.1.0（才認得本機限定）。
+- **已知限制**：macOS 的本機限定入口（第二個 app）沒有實機驗證。
+
 ### 2.3.0
 
 這一版配合新的附屬工具[會議記錄校稿](/features/proofread)，讓「人工校好的逐字稿」可以直接拿來整理會議記錄。
@@ -133,6 +150,18 @@ description: meeting-minutes-pro 1.0.0 到最新版、基本版 meeting-minutes�
 - 第一版：本機轉寫（Whisper large-v3-turbo，安裝時自動選硬體）、說話者分離、影片截圖、繁體輸出、專有名詞提示、幻覺過濾，以及在 Claude 裡整理成會議記錄。
 
 ## 會議記錄校稿（附屬工具）
+
+### 1.1.0
+
+2026-11-08 發布。需要 meeting-minutes-pro **2.2.0 以上**，建議 **2.4.0**。從 1.0.0 升級：重新執行新版的安裝程式（最近的稿清單與校稿進度都保留，存檔格式不變）。
+
+- **認得本機限定**（Pro 2.4 的機敏會議）：輸出資料夾有 `local-only.json`，或 Pro 的 `config.json` 設了 `privacy.local_only: true` 時：
+  - 頁首檔名旁標示「**本機限定**」（滑鼠移上去看原因與解除方法），頁面上方一行說明；首頁清單在那一份旁也標示，整部電腦都開了時首頁標題旁寫「本機限定（整部電腦）」。
+  - 「**用定稿重做會議記錄**」停用並寫明原因；本機服務端也一併拒絕（連費用估算都不做）。
+  - 人工修改、定稿、名詞同步、經驗匯入照常。見[會議記錄校稿 › 本機限定的稿](/features/proofread#local-only)。
+  - 搭配 Pro 2.2、2.3 時也認得標記檔。
+- **測試可以在公開 repo 直接跑**：測試自動找 repo 裡的 Pro 最新版，以舊版 Pro 為前提的情境改用假的 Pro，公開 repo 跑測試不再有預期失敗（見[給開發者](/developer)）。
+- **已知限制**：macOS 的安裝與入口尚未在實機上驗證；視窗寬度小於 760px（手機）只能檢視；Claude 桌面 App 不能使用。
 
 ### 1.0.0
 

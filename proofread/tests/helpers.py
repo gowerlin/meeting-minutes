@@ -3,6 +3,7 @@
 所有測試都在系統暫存區的副本裡跑：不碰真實安裝（%LOCALAPPDATA%\\meeting-minutes-pro、~/.claude/skills）、
 不碰真實的 corrections.tsv／glossary.txt、不呼叫模型。Pro 的模組從 repo 內 Pro 版本目錄的 scripts 唯讀 import
 （環境變數 MMPROOF_PRO_SCRIPTS），並設 PYTHONDONTWRITEBYTECODE=1，不在 Pro 的目錄留下 __pycache__。
+〔1.1.0〕本工具與 Pro 的位置由 locate.py 決定（開發 repo 與公開 repo 的配置都能跑；Pro 取最新的版本目錄）。
 """
 import http.cookiejar
 import json
@@ -19,12 +20,15 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
-APP = ROOT / "meeting-minutes-proofread-v1.0.0" / "payload" / "app"
+sys.path.insert(0, str(TESTS))
+import locate  # noqa: E402
+
+APP = locate.APP
 LAUNCHER = APP / "mmproof_launcher.py"
 SKILLS = ROOT.parent
-PRO_VERSION_DIR = "meeting-minutes-pro-v2.2.0"
-PRO_SCRIPTS = Path(os.environ.get("MMPROOF_TEST_PRO_SCRIPTS")
-                   or SKILLS / "meeting-minutes-pro-skill" / PRO_VERSION_DIR / "payload" / "runtime" / "scripts")
+TOOL_VERSION = locate.TOOL_VERSION
+PRO_SCRIPTS = locate.PRO_SCRIPTS        # 環境變數 MMPROOF_TEST_PRO_SCRIPTS → 開發 repo → 公開 repo（最新版）
+PRO_VERSION = locate.PRO_VERSION
 OUT = TESTS / "_out"
 for p in (str(TESTS), str(APP)):
     if p not in sys.path:
@@ -49,7 +53,7 @@ def apply_env(home: Path, scripts: Path = PRO_SCRIPTS):
 def make_home(root: Path, name: str = "home", config: dict | None = None) -> Path:
     home = root / name
     home.mkdir(parents=True, exist_ok=True)
-    (home / "config.json").write_text(json.dumps(config or {"runtime_version": "2.2.0"}), encoding="utf-8")
+    (home / "config.json").write_text(json.dumps(config or {"runtime_version": PRO_VERSION}), encoding="utf-8")
     (home / "corrections.tsv").write_text(FAKE_CORRECTIONS, encoding="utf-8", newline="\n")
     (home / "glossary.txt").write_text(FAKE_GLOSSARY, encoding="utf-8", newline="\n")
     return home

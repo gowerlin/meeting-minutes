@@ -25,6 +25,11 @@
   另有「貼上兩行」的真主控台測試（`paste_*`，不經 stdin 管線）：PowerShell 7／5.1 在隱藏的新主控台用 WriteConsoleInput
   模擬貼上兩行，確認 Ask-Context 讀完第一行後清掉第二行；bash 在 WSL 的 pty 實測（沒有 WSL 或 MMP_TEST_NO_WSL 時略過）。
 
+- 〔2.4.0〕本機限定（規格 2.4.0 §3）：v24_scenarios：本機限定入口（`-LocalOnly`／`--local-only`）、全域 `privacy.local_only`、
+  輸出資料夾已有 `local-only.json`；檢查不問 AI、轉寫帶 `--local-only`、結束畫面文字與檔案列、假 claude／codex 被呼叫 0 次
+  （假 CLI 把每次呼叫記到 `FAKE_CLI_LOG`）。供應商名稱統一（GPT／Claude）：舊情境檢查的畫面字串在測 2.4.0 時自動換成新說法
+  （`OpenAI gpt-6.1-sol`→`GPT gpt-6.1-sol`、`會送到 OpenAI`→`會送到 GPT（OpenAI）`、`會送到 Anthropic`→`會送到 Claude（Anthropic）`）。
+
 用法：python entry_harness.py --work <暫存目錄> [--shell pwsh powershell bash] [--only 情境名 ...]
 """
 import argparse
@@ -53,10 +58,21 @@ V21 = _testenv.VER >= (2, 1, 0)          # 〔2.1.0〕網頁版
 # 結束畫面列的檔名（兩支入口的清單，依序）；rows 檢查只看這些
 END_ROW_NAMES = ("meeting-minutes.md", "meeting-minutes.html", "notes.md", "notes.html", "notes.json", "transcript.corrected.md",
                  "corrections.suggested.tsv", "reference.json", "context.md", "transcript.md", "transcript.srt",
-                 "transcript.cues.srt", "transcript.corrected.srt", "frames")
+                 "transcript.cues.srt", "transcript.corrected.srt", "frames", "local-only.json")
 V22 = _testenv.VER >= (2, 2, 0)          # 〔2.2.0〕參考資料
 # 〔2.3.0〕--hotwords 特殊字元（PowerShell 5.1 用 Native-Arg）。MMP_TEST_HOTWORDS_CONTROL=1：舊版也跑這個情境（對照組，預期 5.1 失敗）
 V23 = _testenv.VER >= (2, 3, 0) or os.environ.get("MMP_TEST_HOTWORDS_CONTROL") == "1"
+V24 = _testenv.VER >= (2, 4, 0)          # 〔2.4.0〕本機限定、供應商名稱 GPT／Claude
+NAMES_24 = (("OpenAI gpt-6.1-sol", "GPT gpt-6.1-sol"), ("會送到 OpenAI", "會送到 GPT（OpenAI）"),
+            ("會送到 Anthropic", "會送到 Claude（Anthropic）"), ("：OpenAI", "：GPT"))
+
+
+def nm(s: str) -> str:
+    """〔2.4.0〕舊情境寫的畫面字串 → 測 2.4.0 時的新說法（測舊版時原樣）。"""
+    if V24 and isinstance(s, str):
+        for a, b in NAMES_24:
+            s = s.replace(a, b)
+    return s
 
 FAKE_TRANSCRIBE = r'''
 import json, os, shutil, sys, time
@@ -71,6 +87,11 @@ out = src.with_name(src.stem + "_minutes")
 out.mkdir(exist_ok=True)
 for n in ("transcript.md", "transcript.json", "transcript.srt"):
     shutil.copy(mmh / "fixture" / n, out / n)
+lo_field = {}
+if "--local-only" in sys.argv:                          # 〔2.4.0〕同真的程式：寫標記檔（common.write_local_only_marker）
+    import common
+    common.write_local_only_marker(out, os.environ.get("MMP_LOCAL_ONLY_SOURCE") or "transcribe")
+    lo_field = {"local_only": "marker"}
 # 〔2.0.0〕字幕檔與 meta（FAKE_META：JSON，合併進 transcript.json 的 meta，例如 diarization.fallback、speaker_stats）
 (out / "transcript.cues.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nfake\n", encoding="utf-8")
 if os.environ.get("FAKE_META"):
@@ -94,7 +115,7 @@ with rl.checkpoint("asr") as cp:
 rl.event("info", source=src.name, recording_sec=dur, segments=39, paragraphs=33, speakers=4, asr_model="turbo", device="fake")
 print("  [fake] 轉寫完成", file=sys.stderr)
 print(json.dumps({"out_dir": str(out), "duration": dur, "run_id": rl.run_id, "correction": None, "content_type": ctype,
-                  "subtitles": {"cues": {"status": "ok", "cues": 39}}}, ensure_ascii=False))
+                  "subtitles": {"cues": {"status": "ok", "cues": 39}}, **lo_field}, ensure_ascii=False))
 if rl.owns:
     rl.finish()
 '''
@@ -199,10 +220,13 @@ def make_runtime(work: Path) -> Path:
         shutil.rmtree(bin_)
     bin_.mkdir()
     for name in ("claude", "codex"):
+        # 〔2.4.0〕每次被呼叫都記到 FAKE_CLI_LOG（本機限定時要是 0 次）
         (bin_ / f"{name}.cmd").write_text(
-            "@echo off\r\nif \"%1\"==\"login\" exit /b %FAKE_CODEX_LOGIN%\r\necho fake 1.0\r\n", encoding="ascii")
+            "@echo off\r\nif defined FAKE_CLI_LOG echo %~n0 %*>>\"%FAKE_CLI_LOG%\"\r\n"
+            "if \"%1\"==\"login\" exit /b %FAKE_CODEX_LOGIN%\r\necho fake 1.0\r\n", encoding="ascii")
         sh = bin_ / name
-        sh.write_text('#!/bin/bash\nif [ "$1" = "login" ]; then exit "${FAKE_CODEX_LOGIN:-0}"; fi\necho fake 1.0\n',
+        sh.write_text('#!/bin/bash\n[ -n "$FAKE_CLI_LOG" ] && echo "$(basename "$0") $*" >> "$FAKE_CLI_LOG"\n'
+                      'if [ "$1" = "login" ]; then exit "${FAKE_CODEX_LOGIN:-0}"; fi\necho fake 1.0\n',
                       encoding="utf-8", newline="\n")
     return mmh
 
@@ -274,7 +298,38 @@ def scenarios():
         out.update(v22_scenarios())
     if V23:
         out.update(v23_scenarios())
+    if V24:
+        out.update(v24_scenarios())
     return out
+
+
+def v24_scenarios():
+    """〔2.4.0〕本機限定（規格 2.4.0 §3）。答案順序：類型、人數、專有名詞、按 Enter 關閉（沒有 AI 的題目）。
+    opts：local_entry＝本機限定入口（-LocalOnly／--local-only）；pre_marker＝輸出資料夾事先有 local-only.json。"""
+    no_ai = [("calls", ["transcribe"]), ("nocli",), ("notext", "要做 AI 校正嗎"), ("notext", "背景說明"),
+             ("notext", "在 Claude 中說"), ("notext", "會送到"), ("text", "本機限定：沒有送出任何資料（沒有 AI 校正，也沒有 AI 整理）。"),
+             ("text", "下一步：要人工校稿"), ("text", "會議記錄校稿"), ("text", "（Pro 的附屬工具，另外安裝）"),
+             ("text", "本機限定：不做 AI 校正與會議摘要，不會送出任何資料")]
+    ans = ["", "", "", ""]
+    return {
+        "local_only_entry": (["claude", "codex"], 0, {}, None, ans, no_ai + [
+            ("targ_has", "--local-only"), ("marker", True), ("text", "會議轉寫（Pro，本機限定）　meeting-minutes-pro"),
+            ("text", "：這次不會把任何資料送到 GPT 或 Claude"),
+            ("rows", ["transcript.md", "transcript.srt", "transcript.cues.srt", "local-only.json"]),
+            ("text", "要解除本機限定（之後才能用 AI 校正與整理）：這一份：刪除輸出資料夾裡的 local-only.json"),
+            ("notext", "全部：把")], {"local_entry": True}),
+        "local_only_global": (["claude", "codex"], 0, {"privacy": {"local_only": True}}, None, ans, no_ai + [
+            ("targ_not", "--local-only"), ("marker", False), ("text", "==== 會議轉寫（Pro）　meeting-minutes-pro"),
+            ("text", "config.json 的 privacy.local_only）：這次不會把任何資料送到 GPT 或 Claude"),
+            ("rows", ["transcript.md", "transcript.srt", "transcript.cues.srt"]),
+            ("text", "要解除本機限定（之後才能用 AI 校正與整理）：全部：把"), ("text", "privacy.local_only 改成 false")]),
+        # 一般入口，但這份的輸出資料夾已有標記檔（之前用本機限定轉寫過）：轉寫照常、之後不問 AI（偵測 CLI 照舊，不送任何內容）
+        "local_only_marker_existing": (["claude", "codex"], 0, {}, None, ans, [
+            ("calls", ["transcribe"]), ("notext", "要做 AI 校正嗎"), ("notext", "會送到"), ("targ_not", "--local-only"),
+            ("text", "本機限定：不做 AI 校正與會議摘要，不會送出任何資料"), ("text", "本機限定：沒有送出任何資料"),
+            ("rows_has", "local-only.json"), ("text", "這一份：刪除輸出資料夾裡的 local-only.json"),
+            ("cli_only", ("--version", "login"))], {"pre_marker": True}),
+    }
 
 
 def v23_scenarios():
@@ -574,6 +629,11 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
     for n, t in (opts.get("media") or {}).items():
         (work / "media" / n).write_text(t, encoding="utf-8")
     out_dir = work / "media" / "meet_minutes"
+    if opts.get("pre_marker"):                            # 〔2.4.0〕之前用本機限定轉寫過的輸出資料夾
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "local-only.json").write_text('{"local_only": true, "source": "sendto"}\n', encoding="utf-8")
+    cli_log = work / "cli_calls.txt"
+    cli_log.unlink(missing_ok=True)
     sysroot = os.environ.get("SystemRoot", r"C:\Windows")
     bin_ = work / "bin"
     for n in ("claude", "codex"):
@@ -591,20 +651,23 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
         "MEETING_MINUTES_PRO_HOME", "MSYS_NO_PATHCONV", "MSYS2_ARG_CONV_EXCL")}
     env.update(PATH=path, USERPROFILE=str(home), APPDATA=str(home / "AppData" / "Roaming"),
                LOCALAPPDATA=str(home / "AppData" / "Local"), HOME=str(home), MMP_TEST_NO_OPEN="1",
-               FAKE_CODEX_LOGIN=str(login), PYTHONDONTWRITEBYTECODE="1")
+               FAKE_CODEX_LOGIN=str(login), PYTHONDONTWRITEBYTECODE="1",
+               FAKE_CLI_LOG=str(cli_log) if shell != "bash" else cli_log.as_posix())
     if dur:
         env["FAKE_DURATION"] = dur
     if name == "correction_fails":
         env["FAKE_FAIL_CORRECTION"] = "auth_failed"
     env.update(opts.get("env") or {})
+    lo_ps = ["-LocalOnly"] if opts.get("local_entry") else []          # 〔2.4.0〕本機限定入口
+    lo_sh = ["--local-only"] if opts.get("local_entry") else []
     if shell == "pwsh":
         cmd = [shutil.which("pwsh"), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1")] + \
-            [str(x) for x in audios]
+            lo_ps + [str(x) for x in audios]
     elif shell == "powershell":
         cmd = [str(Path(sysroot) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"), "-NoProfile",
-               "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1")] + [str(x) for x in audios]
+               "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1")] + lo_ps + [str(x) for x in audios]
     else:
-        cmd = [str(GIT_BASH), (mmh / "mm-dropped.sh").as_posix()] + [x.as_posix() for x in audios]
+        cmd = [str(GIT_BASH), (mmh / "mm-dropped.sh").as_posix()] + lo_sh + [x.as_posix() for x in audios]
     # bytes：text 模式在 Windows 會把 \n 寫成 \r\n，bash 的 read 會讀到 \r
     text, codes = "", []
     outs, errs = "", ""
@@ -626,8 +689,24 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
     fails = []
     if NOERR and ("noerr",) not in checks:              # 〔2.0.1〕每個情境都不得有錯誤訊息
         checks = list(checks) + [("noerr",)]
+    cli_calls = cli_log.read_text(encoding="utf-8", errors="replace").splitlines() if cli_log.exists() else []
+    checks = [tuple(nm(x) for x in c) for c in checks]   # 〔2.4.0〕舊情境的畫面字串換成新說法
     for c in checks:
-        if c[0] == "noerr":
+        if c[0] == "nocli":                              # 〔2.4.0〕假 claude／codex 一次都沒有被呼叫
+            if cli_calls:
+                fails.append(f"本機限定時不該執行 claude／codex：{cli_calls}")
+        elif c[0] == "cli_only":                         # 〔2.4.0〕只准偵測（--version、login status）
+            bad = [x for x in cli_calls if not any(w in x for w in c[1])]
+            if bad:
+                fails.append(f"不該送出內容：{bad}")
+        elif c[0] == "targ_has":
+            x = next((x for x in calls_ if x["script"] == "transcribe"), None)
+            if not x or c[1] not in x["argv"]:
+                fails.append(f"transcribe argv 沒有 {c[1]}：{x and x['argv']}")
+        elif c[0] == "marker":
+            if (out_dir / "local-only.json").exists() != c[1]:
+                fails.append(f"local-only.json 存在 {not c[1]}，應為 {c[1]}")
+        elif c[0] == "noerr":
             for label, s in (("主控台", outs), ("stderr", errs)):
                 hit = [m for m in ERROR_MARKERS if m in s]
                 if hit:

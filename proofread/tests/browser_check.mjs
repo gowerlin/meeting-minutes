@@ -15,9 +15,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const { chromium } = createRequire(path.join(process.env.NODE_PATH || HERE, 'noop.js'))('playwright')
 const PY = process.env.PYTHON || 'python'
 const PYEXE = execFileSync(PY, ['-c', 'import sys;print(sys.executable)']).toString().trim()
-const APP = path.join(HERE, '..', 'meeting-minutes-proofread-v1.0.0', 'payload', 'app')
-const PRO = process.env.MMPROOF_TEST_PRO_SCRIPTS ||
-  path.join(HERE, '..', '..', 'meeting-minutes-pro-skill', 'meeting-minutes-pro-v2.2.0', 'payload', 'runtime', 'scripts')
+// 〔1.1.0〕本工具與 Pro 的位置由 locate.py 決定（開發 repo 與公開 repo 都能跑）。「重做會議記錄」停用的畫面要 Pro 2.2.x，
+// 所以從最新的 Pro 複製一份假的 2.2.0（materials.py --fake-pro；只改版號，auto_minutes.py 換成假的）
+const LOC = execFileSync(PY, ['-B', '-c', 'import sys; sys.path.insert(0, sys.argv[1]); import locate; print(locate.APP); print(locate.PRO_SCRIPTS)', HERE])
+  .toString().trim().split(/\r?\n/)
+const APP = LOC[0]
+const REAL_PRO = LOC[1]
+let PRO = REAL_PRO
 const OUT = path.join(HERE, '_out')
 const SHOTS = path.join(OUT, 'screenshots')
 fs.mkdirSync(SHOTS, { recursive: true })
@@ -32,6 +36,8 @@ function prep () {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mmproof-browser-'))
   execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), path.join(work, 'demo')], { env: envFor(work) })
   execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), '--long', path.join(work, 'long')], { env: envFor(work) })
+  PRO = path.join(work, 'fake-pro-2.2.0')
+  execFileSync(PY, ['-B', path.join(HERE, 'materials.py'), '--fake-pro', REAL_PRO, PRO, '2.2.0'], { env: envFor(work) })
   const home = path.join(work, 'home')
   fs.mkdirSync(home)
   fs.writeFileSync(path.join(home, 'config.json'), '{"runtime_version": "2.2.0"}')
@@ -350,6 +356,23 @@ async function main () {
   const flashed = await p2.$$eval('.banner.info p', es => es.some(e => /又從右鍵/.test(e.textContent)))
   rec('同一份再開：提示頁（不開第二個可編輯分頁）、原分頁收到提示', /已經在另一個分頁開啟/.test(attTxt) && (await p3.$eval('.save', e => e.textContent)) === '唯讀（這個分頁不會儲存）' && flashed)
   await p3.close()
+  // ---- 〔1.1.0〕本機限定（Pro 2.4.0 的機敏會議）：D3 放標記檔 local-only.json → 頁首標示、提示列；首頁卡片標示
+  fs.writeFileSync(path.join(D('D3'), 'local-only.json'), '{"local_only": true, "source": "sendto"}\n')
+  const loUrl = launch(work, [D('D3')])
+  const pLo = await ctx.newPage()
+  watch(pLo)
+  await pLo.goto(loUrl[0])
+  await pLo.waitForSelector('.top .tag.lo')
+  const lo = await pLo.evaluate(() => ({ tag: document.querySelector('.top .tag.lo').textContent,
+    title: document.querySelector('.top .tag.lo').title,
+    banner: [...document.querySelectorAll('.banner p')].map(p => p.textContent).join('｜') }))
+  const loRows = await topRows(pLo)
+  await shot(pLo, 'local-only-1440-dark.png', TOPBAR)
+  rec('本機限定：頁首「本機限定」標示（含原因與解除方法）、提示列寫重做停用與其他照常，頂端列一行',
+    lo.tag === '本機限定' && /local-only\.json/.test(lo.title) && /刪除/.test(lo.title) &&
+    /本機限定：這份不送 GPT 或 Claude。人工修改、定稿、經驗匯入照常；「用定稿重做會議記錄」停用。/.test(lo.banner) && loRows === 1,
+    `${lo.tag}｜${lo.banner}｜頂端列 ${loRows} 行`)
+  await pLo.close()
   const homeUrl = launch(work, [], ['--home-page'])
   const p4 = await ctx.newPage()
   watch(p4)
@@ -359,6 +382,12 @@ async function main () {
   await shot(p4, 'home-1440-dark.png')
   rec('首頁：開著的稿、最近的稿（上次儲存、已處理 n／N（p%））、自動結束說明', /開著的稿（\d+）/.test(homeTxt) && /上次儲存 \d{4}-\d\d-\d\d \d\d:\d\d/.test(homeTxt) &&
     /已處理 \d+／\d+（\d+%）/.test(homeTxt) && /自動結束/.test(homeTxt))
+  const loCards = await p4.$$eval('.card', es => es.map(e => ({ name: e.querySelector('.name span').textContent, lo: !!e.querySelector('.tag.lo') })))
+  const tagGap = await p4.$eval('.card .tag.lo', e => e.getBoundingClientRect().left - e.previousElementSibling.getBoundingClientRect().right)
+  await shot(p4, 'home-local-only-1440-dark.png')
+  rec('本機限定：首頁只有放了標記檔的那份標「本機限定」（標示與名稱間距 ≥ 4px）',
+    loCards.some(c => c.lo) && loCards.every(c => c.lo === /^D3-/.test(c.name)) && tagGap >= 4,
+    loCards.map(c => c.name + (c.lo ? '［本機限定］' : '')).join('｜') + `；間距 ${tagGap.toFixed(1)} px`)
   await p4.close()
 
   // ---- 手機寬度：只讀

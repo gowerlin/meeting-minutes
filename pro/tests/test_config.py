@@ -244,7 +244,7 @@ V21 = _testenv.VER >= (2, 1, 0)
 V22 = _testenv.VER >= (2, 2, 0)
 # 〔2.1.0〕升級時另補 html 區塊（規格 2.1.0 §6.1）；2.0.x 只補 2.0 的五塊；〔2.2.0〕另補 reference 區塊（規格 2.2.0 §8.1）
 V2_BLOCKS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] + (["html"] if V21 else []) + \
-    (["reference", "consistency"] if V22 else [])   # 〔2.2.0〕consistency：全文用字統一
+    (["reference", "consistency"] if V22 else []) + _testenv.V24_BLOCKS   # 〔2.2.0〕consistency：全文用字統一；〔2.4.0〕privacy
 V110_CONFIG = dict(copy.deepcopy(V100_CONFIG), runtime_version="1.1.0",
                    punctuation={"enabled": True, "model": "ct-transformer-int8", "paragraph_gap": 2.5,
                                 "paragraph_max_chars": 200, "whisper_density": 20},
@@ -287,7 +287,8 @@ class UpgradeTo200(TempHome):
         added = common.added_config_keys(V122_CONFIG, after)
         msg = "config.json 已補上新版設定鍵：{0}（既有的值不變）".format("、".join(added))
         self.assertEqual(msg, "config.json 已補上新版設定鍵：content_type、diarization、keyframes、content_types、subtitles"
-                         + ("、html" if V21 else "") + ("、reference、consistency" if V22 else "") + "（既有的值不變）")
+                         + ("、html" if V21 else "") + ("、reference、consistency" if V22 else "") + "".join("、" + k for k in _testenv.V24_BLOCKS)
+                         + "（既有的值不變）")
 
     def test_partial_blocks(self):
         before = dict(copy.deepcopy(V122_CONFIG), runtime_version="2.0.0",

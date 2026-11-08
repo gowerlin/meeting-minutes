@@ -1,6 +1,8 @@
 """伺服器整合測試（不開瀏覽器）：單一服務與交接、多份同時 5 情境、安全、暫存與接續、版本衝突、校正版被重新產生、
 定稿與字幕、經驗整理與匯入／復原、名詞同步、重做會議記錄（Pro 2.2.0 停用；假的 Pro 2.3.0）、寫入回饋（試跑、結果、部分失敗、
 寫檔錯誤）、操作紀錄、媒體、生命週期（閒置結束、--shutdown、版號不同、殘留）、長稿效能。
+〔1.1.0〕本機限定（Pro 2.4.0 的機敏會議）：假的 Pro 2.2.0／2.3.0／2.4.0 各跑一次，標記檔與全域設定 → 重做停用並寫原因、
+首頁與頁面的 local_only、其他功能（定稿）照常；沒有本機限定時重做是否可用只看 Pro 版號。
 
   python -B test_server.py          （或經由 run_tests.py）
 
@@ -377,11 +379,16 @@ def main():
     R.rec("沒有 transcript.json：不產生字幕並說明原因", st == 200 and [x["file"] for x in n4["plan"]] == ["transcript.final.md"]
           and "沒有 transcript.json" in n4["srt_note"], n4["srt_note"])
 
-    # ================================================================ 重做（Pro 2.2.0：停用）
+    # ================================================================ 重做（Pro 2.2.x：停用）
+    # 〔1.1.0〕repo 內的 Pro 是 2.3.0 以上時（公開 repo 只有最新版），停用的情境改在下面「本機限定」一節用假的 Pro 2.2.0 測
     st, rd = A2.post(d1, "redo", {"dry_run": True})
     _, dd = A2.data(d1)
-    R.rec("重做：Pro 2.2.x 停用並說明原因", st == 409 and rd["error"] == "pro_too_old" and dd["redo"]["available"] is False
-          and "2.3.0" in dd["redo"]["reason"], dd["redo"]["reason"])
+    if H.locate.vtuple(H.PRO_VERSION) < (2, 3, 0):
+        R.rec("重做：Pro 2.2.x 停用並說明原因", st == 409 and rd["error"] == "pro_too_old" and dd["redo"]["available"] is False
+              and "2.3.0" in dd["redo"]["reason"], dd["redo"]["reason"])
+    else:
+        R.rec(f"重做：Pro {H.PRO_VERSION}（≥ 2.3.0）可用", dd["redo"]["available"] is True and dd["redo"]["reason"] is None
+              and dd["local_only"] is None, json.dumps(dd["redo"], ensure_ascii=False))
 
     # ================================================================ 開啟資料夾、操作紀錄、媒體
     rv = [A2.post(d1, "reveal", {"target": t})[0] for t in ("folder", "mmh", "backups", "../outside", "C")]
@@ -520,7 +527,7 @@ def main():
     while H.pid_alive(inst3["pid"]) and time.time() - t_old < 5:
         time.sleep(0.2)
     R.rec("版號不同（升級後舊服務還在）→ 舊的結束、啟動新版", code7 == 0 and res7[0]["status"] == "open" and inst4["pid"] != inst3["pid"]
-          and inst4["version"] == "1.0.0" and not H.pid_alive(inst3["pid"]), "")
+          and inst4["version"] == H.TOOL_VERSION and not H.pid_alive(inst3["pid"]), "")
 
     # ---- --shutdown：分頁收到 closing → 先存再放開 → 服務馬上結束
     E = H.Tab(inst4["port"], "tabE")
@@ -622,6 +629,63 @@ def main():
     _, d6b = G.data(id6)
     R.rec("重做紀錄與「上次的重做沒有完成」偵測", "重做會議記錄" in acts6 and "重做會議記錄（失敗）" in acts6 and d6b["redo"]["interrupted"] is True, "")
     H.stop(hr)
+
+    # ================================================================ 〔1.1.0〕本機限定：搭 Pro 2.2.0／2.3.0／2.4.0
+    lo_detail = []
+    lo_ok = {"marker": True, "config": True, "plain": True, "other": True}
+    for v in ("2.2.0", "2.3.0", "2.4.0"):
+        fv = H.materials.make_fake_pro(H.PRO_SCRIPTS, work / f"fake-pro-lo-{v}", version=v)
+        for mode in ("plain", "config"):
+            hv = H.make_home(work, f"home-lo-{v}-{mode}", {"runtime_version": v, **({"privacy": {"local_only": True}}
+                                                                                    if mode == "config" else {})})
+            base = work / "lo" / v / mode
+            folders = []
+            for name in (("D2-demo_minutes", "D3-demo_minutes") if mode == "plain" else ("D2-demo_minutes",)):
+                fd = base / name
+                shutil.copytree(D[name[:2]], fd)
+                shutil.rmtree(fd / ".proofread", ignore_errors=True)
+                folders.append(fd)
+            if mode == "plain":
+                (folders[1] / "local-only.json").write_text('{"local_only": true, "source": "sendto"}\n', encoding="utf-8")
+            rv, uv, _, _ = H.launch(hv, folders, env=H.base_env(hv, fv))
+            iv = H.instance(hv)
+            T = H.Tab(iv["port"], f"lo-{v}-{mode}")
+            T.login(collect(uv)[0])
+            ids = [x["id"] for x in rv]
+            _, docs = T.js("GET", "/api/docs")
+            flags = {o["name"]: o["local_only"] for o in docs["open"]}
+            for k, did in enumerate(ids):
+                T.lease(did)
+                _, dv = T.data(did)
+                st_r, rr = T.post(did, "redo", {"dry_run": True})
+                lo = dv.get("local_only")
+                is_marker = mode == "plain" and k == 1
+                if mode == "config" or is_marker:
+                    want = ["config"] if mode == "config" else ["marker"]
+                    ok = (lo and lo["sources"] == want and dv["redo"]["available"] is False and dv["redo"]["local_only"] is True
+                          and "本機限定" in dv["redo"]["reason"] and "GPT 或 Claude" in dv["redo"]["reason"]
+                          and ("local-only.json" in dv["redo"]["reason"] if is_marker else "privacy.local_only" in dv["redo"]["reason"])
+                          and st_r == 409 and rr["error"] == "local_only" and flags[folders[k].name] is True
+                          and docs["local_only_global"] is (mode == "config"))
+                    lo_ok["marker" if is_marker else "config"] &= bool(ok)
+                    if is_marker:          # 其他功能照常：定稿可以做
+                        st_f, fr = T.post(did, "finalize", {"allow_pending": True})
+                        lo_ok["other"] &= st_f == 200 and (folders[k] / "transcript.final.md").exists()
+                    lo_detail.append(f"{v}/{'標記檔' if is_marker else '全域'}：redo {st_r} {rr.get('error')}")
+                else:
+                    want_av = H.locate.vtuple(v) >= (2, 3, 0)
+                    ok = lo is None and dv["redo"]["available"] is want_av and dv["redo"]["local_only"] is False \
+                        and flags[folders[k].name] is False and docs["local_only_global"] is False
+                    lo_ok["plain"] &= bool(ok)
+                    lo_detail.append(f"{v}/一般：重做{'可用' if want_av else '停用'}")
+            H.stop(hv)
+    R.rec("本機限定（標記檔）：Pro 2.2／2.3／2.4 都停用重做並寫原因（本機限定、GPT 或 Claude、刪除 local-only.json），重做 API 409 local_only，首頁標示",
+          lo_ok["marker"], "；".join(x for x in lo_detail if "標記檔" in x))
+    R.rec("本機限定（全域 privacy.local_only）：Pro 2.2／2.3／2.4 都停用重做、首頁 local_only_global", lo_ok["config"],
+          "；".join(x for x in lo_detail if "全域" in x))
+    R.rec("沒有本機限定：重做是否可用只看 Pro 版號（2.2 停用、2.3／2.4 可用），首頁不標示", lo_ok["plain"],
+          "；".join(x for x in lo_detail if "一般" in x))
+    R.rec("本機限定時其他功能照常（定稿寫出 transcript.final.md）", lo_ok["other"], "")
 
     # ================================================================ server.log
     logs = "".join(p.read_text(encoding="utf-8") for p in work.rglob("server.log*"))

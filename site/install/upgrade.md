@@ -38,12 +38,19 @@ description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2、從 2.2 升級到 2
 2. **入口可能多一題「背景說明（一行）」**：答應 AI 校正或摘要、而且錄音旁沒有說明檔時才問，直接按 Enter 跳過；不想被問：`reference.ask_context` 改成 `false`。
 3. **新檔案**：輸出資料夾可能多 `reference.json`、`context.md`；校正版與會議記錄裡同一個英文名詞的寫法會[統一](/features/consistency)。
 
-2.2.x → <MmVersion />：重新執行安裝程式即可。`config.json` 的設定鍵沒有變（只更新 `runtime_version`），入口題目、詞表與輸出檔都不變。改變的地方：
+2.2.x → 2.3.x：重新執行安裝程式即可。`config.json` 的設定鍵沒有變（只更新 `runtime_version`），入口題目、詞表與輸出檔都不變。改變的地方：
 
 1. **有定稿逐字稿時，會議摘要改用它**：用[會議記錄校稿](/features/proofread)定稿過的資料夾（有 `transcript.final.md`），重跑會議摘要時會依定稿整理，表頭寫「已人工校稿」。定稿比校正版舊（之後又重新轉寫或校正過）時，會改用校正版並印一行說明。
 2. **新指令參數**：`auto_minutes.py --source final`（指定用定稿）、`--estimate-only`（只估費用、不呼叫模型、不寫檔）；完成時的結果多了實際費用。見[手動執行與參數](/usage/advanced)。
 3. **解除安裝會一起移除會議記錄校稿**（有安裝的話），不會留下指向不存在檔案的右鍵選單。
 4. **Claude 桌面 App 請改上傳新版的上傳檔**（桌面上的 zip 已換成新版）。
+
+2.3.x → <MmVersion />：重新執行安裝程式即可。`config.json` 會補上 `privacy` 這一組設定（`local_only: false`，畫面寫「config.json 已補上新版設定鍵：privacy（既有的值不變）」）；詞表、對照表、GPU 與精度設定、輸出檔都不變。改變的地方：
+
+1. **多一個右鍵入口「會議轉寫（Pro，本機限定）」**（macOS 多一個同名的 app）：機敏會議用，這一份什麼都不送 GPT 或 Claude（見[本機限定](/features/local-only)）。原本的「會議轉寫（Pro）」照舊。
+2. **畫面上的供應商名稱改成 GPT／Claude**：例如「AI 校正：GPT gpt-6.1-sol（…）；逐字稿文字會送到 GPT（OpenAI）」「[Enter] 預設（GPT gpt-6.1-sol）」。設定值（`openai`、`claude`）、旗標（`--openai`、`--claude`）與輸出檔的表頭（例「自動整理：OpenAI gpt-6.1-sol low，…」）都不變。
+3. **Claude 桌面 App 請改上傳新版的上傳檔**（桌面上的 zip 已換成新版）。
+4. **會議記錄校稿建議一起升到 <MmVersion product="proofread" />**：才認得本機限定（舊版在本機限定的那一份按「重做」時會被 Pro 拒絕，不會送出，見[安裝會議記錄校稿 › 升級](/install/proofread#升級)）。
 
 從 2.0.x 直接升到 <MmVersion /> 也只要重新執行一次安裝程式，上面各段的改變都會一起套用。
 
@@ -60,7 +67,7 @@ description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2、從 2.2 升級到 2
 ### 會移除
 
 - Claude CLI 裡的 skill
-- 轉寫入口（Windows 的右鍵「傳送到」捷徑、macOS 的「會議轉寫（Pro）」）
+- 轉寫入口（Windows 的右鍵「傳送到」捷徑、macOS 的「會議轉寫（Pro）」；2.4 起連同「會議轉寫（Pro，本機限定）」）
 - 桌面上的上傳用 zip
 - runtime 與模型（**會先問你**）。選擇刪除時，標點模型、OpenCC 回復表、對照表的自動寫入紀錄、GPU 說話者分離套件與權重也會一起刪除
 - 有自訂範本時會再問「刪除自訂範本 N 份？[y/N]」：直接按 Enter＝保留，範本會先複製到桌面的 `meeting-minutes-pro-templates-備份` 資料夾
