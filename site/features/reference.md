@@ -122,11 +122,11 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 
 合成素材實測（API 等價；用訂閱時不另計費，但會用掉額度）：
 
-| | Claude opus | OpenAI gpt-6.1-sol |
+| | GPT（OpenAI）gpt-6.1-sol | Claude（Anthropic）opus |
 |---|---|---|
-| 整理截圖一次（5 張） | 約 US$0.11 | 約 US$0.04 |
-| 每段校正多送的參考資料文字 | 約 600 個 token | 約 500 個 token |
-| 2 小時會議合計多出 | 約 US$0.20 | 約 US$0.06 |
+| 整理截圖一次（5 張） | 約 US$0.04 | 約 US$0.11 |
+| 每段校正多送的參考資料文字 | 約 500 個 token | 約 600 個 token |
+| 2 小時會議合計多出 | 約 US$0.06 | 約 US$0.20 |
 
 整理截圖約多 15～30 秒；一場會議的 AI 費用約多 10～15%。
 

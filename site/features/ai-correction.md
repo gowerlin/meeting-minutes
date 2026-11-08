@@ -1,6 +1,6 @@
 ---
 title: AI 校正與會議摘要
-description: 校正版逐字稿、自動校正、會議摘要；送出去的是什麼（含 2.2 起的影片截圖與參考資料）、不送什麼；Claude 與 OpenAI、訂閱通道與 API 通道。
+description: 校正版逐字稿、自動校正、會議摘要；送出去的是什麼（含 2.2 起的影片截圖與參考資料）、不送什麼；GPT（OpenAI）與 Claude（Anthropic）、訂閱通道與 API 通道。
 ---
 
 # AI 校正與會議摘要
@@ -12,15 +12,15 @@ description: 校正版逐字稿、自動校正、會議摘要；送出去的是�
 | | 會不會送出 |
 |---|---|
 | 音檔、錄影 | ❌ 不會。轉寫全在你的電腦上 |
-| 逐字稿**文字** | ⚠ 只在你回答「是」的時候，送到你選的那一家（Anthropic 的 Claude，或 OpenAI） |
+| 逐字稿**文字** | ⚠ 只在你回答「是」的時候，送到你選的 GPT（OpenAI）或 Claude（Anthropic） |
 | 影片截圖（2.2 起） | ⚠ **AI 校正**時送出最多 8 張（去掉空白與重複的畫面，縮到長邊 1280 px），用來認出與會者、會議日期與名詞。**會議摘要不送截圖**。不要送：`config.json` 的 `reference.frames` 改成 `false`（單次 `--no-frames`） |
 | 背景說明、會議文件（2.2 起） | ⚠ 有放的話，AI 校正與會議摘要都會送背景說明全文，以及會議文件裡挑出的名詞與相關段落；**文件原檔不送**（見[參考資料](/features/reference)） |
 | API 金鑰、帳號 | ❌ 不會寫進任何設定檔、log 或輸出檔；金鑰只從環境變數讀 |
 
 每一題都會寫明這次要送什麼（例「逐字稿文字、截圖 5 張、會議文件 3 份的名詞與段落會送到 OpenAI」）、送到哪一家，並附這次的預估時間與費用。
 
+- GPT：以 ChatGPT 帳號登入 Codex 時，資料使用依你的 ChatGPT 資料控制設定，請自行到 ChatGPT 的設定確認；API 通道送出的資料預設不用於訓練。
 - Claude：依 Anthropic 對你的帳號（訂閱）或 API 適用的條款處理。
-- OpenAI：以 ChatGPT 帳號登入 Codex 時，資料使用依你的 ChatGPT 資料控制設定，請自行到 ChatGPT 的設定確認；API 通道送出的資料預設不用於訓練。
 - 使用 Codex 時，你自己的 Codex 使用者設定檔（`~/.codex/AGENTS.md`，如果有）會隨每次呼叫一起送出，這是 Codex 本身的行為。本程式已關掉 Codex 的所有工具（不能讀寫檔、不能執行指令）。
 
 ::: warning 含個資或受法規限制的錄音
@@ -46,7 +46,7 @@ description: 校正版逐字稿、自動校正、會議摘要；送出去的是�
 
 ## AI 校正
 
-轉寫完成後，由你電腦上的程式直接呼叫 Claude 或 OpenAI，校正同音錯字與專有名詞，產出：
+轉寫完成後，由你電腦上的程式直接呼叫 GPT 或 Claude，校正同音錯字與專有名詞，產出：
 
 - `transcript.corrected.md`：校正版逐字稿
 - `corrections.suggested.tsv`：建議加進[固定錯誤對照表](/features/accuracy#固定錯誤對照表)的項目（**還沒生效**，你確認後才加入）
@@ -70,10 +70,10 @@ AI 校正失敗（沒登入、額度用完、網路、逾時）**不影響轉寫
 
 | 供應商 | 訂閱通道（預設） | API 通道（選用，尚未用真的金鑰實測） |
 |---|---|---|
+| GPT（OpenAI） | Codex 的 `codex` 指令（唯讀、不執行工具），用你的 ChatGPT 訂閱的 Codex 額度 | OpenAI Python SDK，環境變數 `OPENAI_API_KEY`，依用量付費 |
 | Claude（Anthropic） | Claude Code 的 `claude` 指令，用你的 Claude 訂閱額度 | Anthropic Python SDK，環境變數 `ANTHROPIC_API_KEY`，依用量付費 |
-| OpenAI | Codex 的 `codex` 指令（唯讀、不執行工具），用你的 ChatGPT 訂閱的 Codex 額度 | OpenAI Python SDK，環境變數 `OPENAI_API_KEY`，依用量付費 |
 
-**預設怎麼選**：找得到 `codex` 指令而且已登入時用 OpenAI `gpt-6.1-sol`；否則找得到 `claude` 指令就用 Claude `opus`；兩個都沒有就不問這兩題（結束畫面會寫怎麼安裝與登入）。
+**預設怎麼選**：找得到 `codex` 指令而且已登入時用 GPT `gpt-6.1-sol`；否則找得到 `claude` 指令就用 Claude `opus`；兩個都沒有就不問這兩題（結束畫面會寫怎麼安裝與登入）。
 
 ::: info 政策提醒
 用自己的訂閱、在自己的電腦上讓程式呼叫 `claude` 或 `codex`，屬於自用情境。若要把這個工具提供給別人使用，請先自行確認 Anthropic 與 OpenAI 對訂閱用於腳本呼叫的條款，或請對方改用 API 通道。
@@ -100,7 +100,7 @@ AI 校正用哪個模型？（錄音 1 小時 19 分；預估依合成素材實�
 
 | 模型 | AI 校正 | 會議摘要 | 適合 |
 |---|---|---|---|
-| OpenAI `gpt-6.1-sol` `low`（有 Codex 時的預設） | 修對約 81～90%，錯改 0～1.5%；約多 7 分鐘 | 決議、待辦涵蓋最多，最便宜；約多 6～8 分鐘 | 一般情況 |
+| GPT `gpt-6.1-sol` `low`（有 Codex 時的預設） | 修對約 81～90%，錯改 0～1.5%；約多 7 分鐘 | 決議、待辦涵蓋最多，最便宜；約多 6～8 分鐘 | 一般情況 |
 | Claude `opus` `medium`（沒有 Codex 時的預設） | 修對約 78～87%，錯改 1.6～2.8%；約多 5 分鐘 | 寫得最細；約多 4～6 分鐘 | 想用 Claude 訂閱、重要會議 |
 | Claude `sonnet` | 準確率最低（長會議漏改明顯較多） | 最快（約 sol 的 1/3 時間），可能漏 1～2 項待辦 | 長會議想少等 |
 

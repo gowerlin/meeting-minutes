@@ -56,7 +56,7 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 | 要做 AI 校正嗎？ | 讓 AI 修正錯字、產出校正版逐字稿（[AI 校正](/features/ai-correction#ai-校正)） | 一般會議按 Enter（是）。含個資、不能送雲端的錄音輸入 `n` |
 | 要產生會議摘要嗎？ | 讓 AI 整理出會議記錄（類型不是會議時，會改問「要產生課程筆記嗎？」這類題目） | 想直接拿到會議記錄就按 Enter（是） |
 | 背景說明（一行） | 2.2 起，回答「是」之後、而且錄音旁沒有說明檔時才問：輸入會議名稱、與會者全名，幫 AI 補上姓名與日期（[參考資料](/features/reference#背景說明)） | 直接按 Enter 跳過也可以 |
-| 用哪個模型？ | 回答「是」之後才問，列出可用的模型、預估時間與費用 | 按 Enter 用預設；想快一點可以選 Claude sonnet |
+| 用哪個模型？ | 回答「是」之後才問，列出可用的模型、預估時間與費用 | 按 Enter 用預設（有已登入的 Codex 時是 GPT，否則是 Claude opus）；想快一點可以選 Claude sonnet |
 
 - 每一題都寫明這次要送什麼、送到哪一家：逐字稿文字一定有；錄影做 AI 校正時另有**影片截圖**（最多 8 張，縮小後），有放背景說明或會議文件時也會列出。**音檔與文件原檔不會送出**；會議摘要不送截圖。不想送截圖：`config.json` 的 `reference.frames` 改成 `false`（見[參考資料](/features/reference#怎麼關)）。
 - 錄音超過 2 小時時，說明會變成黃色的 ⚠ 提醒，寫明比較長的時間與費用。
@@ -78,7 +78,7 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 
 | 檔案 | 用途 |
 |---|---|
-| `transcript.md` | 閱讀用逐字稿，含時間碼、講者和畫面標記。交給 Claude 的就是這個 |
+| `transcript.md` | 閱讀用逐字稿，含時間碼、講者和畫面標記。交給 AI 校正與整理的就是這個 |
 | `transcript.json` | 結構化逐字稿（給程式用），保留辨識原文 |
 | `transcript.srt` | 字幕檔，一段一條 |
 | `transcript.cues.srt` | 照字幕規則切條的字幕（不經 AI） |

@@ -59,7 +59,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `--no-punct`、`--paragraph-gap SEC`、`--paragraph-max-chars N` | 關閉分段標點；停頓幾秒換段（預設 2.0）；滿幾字換段（預設 200） |
 | `--no-cues` | 這次不產生 `transcript.cues.srt` |
 | `--correct`／`--no-correct` | 這次開／關自動校正（`--correct` 代表你同意送出逐字稿文字與[參考資料](/features/reference)） |
-| `--claude`／`--openai` | 這次用 Claude／OpenAI 自動校正 |
+| `--claude`／`--openai` | 這次用 Claude（Anthropic）／GPT（OpenAI）自動校正 |
 | `--correct-model M`、`--correct-effort E`、`--correct-channel cli\|api` | 這次的模型、推理強度、通道 |
 | `--context "<一行>"` | 背景說明一行，寫進 `<檔名>_minutes/context.md`（已有就覆寫，舊檔改名備份）；`auto_correct.py`、`auto_minutes.py` 也有（2.2） |
 | `--refs <檔或資料夾>` | 另外加入會議文件（PDF、PPTX、DOCX、TXT、MD；可重複）；三支程式都有（2.2） |
@@ -102,10 +102,10 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `opencc_keep.enabled` | `true` | OpenCC 詞彙回復表 |
 | `correction.enabled` | `false` | Claude CLI 對話與命令列的自動校正（入口每次都問，不看這個值） |
 | `correction.ask_default`、`minutes.ask_default` | `true` | 入口兩題按 Enter 的答案（`false`＝Enter 是「否」） |
-| `correction.provider`、`minutes.provider` | `auto` | `auto`／`claude`／`openai`；`auto` 時已登入的 `codex` 優先 |
+| `correction.provider`、`minutes.provider` | `auto` | `auto`／`claude`／`openai`；`auto` 時已登入的 `codex`（GPT）優先，否則 `claude`（Claude） |
 | `correction.channel`、`minutes.channel` | `cli` | `cli`（訂閱指令）／`api`（SDK＋環境變數金鑰） |
 | `correction.claude.model`／`.effort` | `opus`／`medium` | AI 校正用的 Claude 模型與推理強度 |
-| `correction.openai.model`／`.effort` | `gpt-6.1-sol`／`low` | AI 校正用的 OpenAI 模型與推理強度 |
+| `correction.openai.model`／`.effort` | `gpt-6.1-sol`／`low` | AI 校正用的 GPT 模型與推理強度 |
 | `correction.confirm_over_minutes` | `120` | 錄音超過幾分鐘時多印一行時間與費用提醒 |
 | `correction.corrections_auto.mode` | `"off"` | [對照表自動寫入](/features/accuracy#對照表自動寫入-選用-預設關) |
 | `minutes.chunk_chars` | `12000` | 超過這個字數就分段整理再彙整 |

@@ -11,13 +11,13 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 
 ### 我的錄音會被上傳嗎？
 
-不會。語音辨識、說話者分離、分段標點都在你的電腦上完成，音檔一律不送。只有在你選擇做 AI 校正或會議摘要時，**逐字稿文字**才會送到你選的供應商（Anthropic 或 OpenAI）。2.2 起，AI 校正另外會送**影片截圖**（最多 8 張，縮小後），以及你放的背景說明與會議文件的名詞和段落；會議摘要不送截圖。每次送出前都會先問你，詢問行寫明這次要送什麼。不想送截圖：`config.json` 的 `reference.frames` 改成 `false`。詳見 [AI 校正與會議摘要](/features/ai-correction#送出去的是什麼)與[參考資料](/features/reference)。
+不會。語音辨識、說話者分離、分段標點都在你的電腦上完成，音檔一律不送。只有在你選擇做 AI 校正或會議摘要時，**逐字稿文字**才會送到你選的 GPT（OpenAI）或 Claude（Anthropic）。2.2 起，AI 校正另外會送**影片截圖**（最多 8 張，縮小後），以及你放的背景說明與會議文件的名詞和段落；會議摘要不送截圖。每次送出前都會先問你，詢問行寫明這次要送什麼。不想送截圖：`config.json` 的 `reference.frames` 改成 `false`。詳見 [AI 校正與會議摘要](/features/ai-correction#送出去的是什麼)與[參考資料](/features/reference)。
 
 ### 要付費嗎？
 
 - 程式本身免費（MIT 授權）。
 - 轉寫在本機進行，不需要任何付費服務。
-- 選用的 AI 校正與會議摘要預設透過你自己的 Claude 或 ChatGPT 訂閱（用 Claude Code 或 Codex），**不另外收費，但會用掉方案額度**。改用 API 金鑰時依用量計費。畫面上的「API 等價費用」是換算成 API 大約要多少錢，方便比較。
+- 選用的 AI 校正與會議摘要預設透過你自己的 ChatGPT 或 Claude 訂閱（用 Codex 或 Claude Code），**不另外收費，但會用掉方案額度**。改用 API 金鑰時依用量計費。畫面上的「API 等價費用」是換算成 API 大約要多少錢，方便比較。
 
 ### 會議記錄校稿是什麼？要另外付錢嗎？
 
@@ -46,8 +46,8 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 
 另外：
 
-- S1、S2 只是依聲音分群，對應到姓名要靠 Claude 從內容推斷，或由你提供與會名單。
-- AI 校正拿不準的地方會標成待確認；OpenAI 的模型比較少標待確認，看校正摘要時請多留意。
+- S1、S2 只是依聲音分群，對應到姓名要靠 AI 從內容推斷，或由你提供與會名單。
+- AI 校正拿不準的地方會標成待確認；GPT 比較少標待確認，看校正摘要時請多留意。
 - 會議的待釐清問題有程式輔助，但不保證不漏；長會議請對照議題查看。
 - 說話者分離與各項預設值只用合成素材實測過，真實錄音的效果還沒驗證（見[研究方法](/design/research#已知限制)）。
 
@@ -108,8 +108,8 @@ description: 音檔會上傳嗎、要不要付費、準確度與限制、proxy�
 |---|---|
 | 入口沒有問「要做 AI 校正嗎？」 | 找不到 `claude`／`codex` 指令，或 `codex` 沒登入又沒有 `claude`；結束畫面會寫原因與安裝、登入方式 |
 | 自動校正沒跑 | 看輸出資料夾 `auto_correct.json` 的 `reason`：`cli_not_found`＝找不到指令、`auth_failed`＝沒登入、`api_key_missing`＝API 通道沒設定金鑰 |
+| `auth_failed`（GPT） | 在終端機執行 `codex login` 登入；`codex login status` 可以確認（不耗額度） |
 | `auth_failed`（Claude） | 在終端機執行 `claude`，輸入 `/login` 登入，再用 `auto_correct.py` 補做 |
-| `auth_failed`（OpenAI） | 在終端機執行 `codex login` 登入；`codex login status` 可以確認（不耗額度） |
 | 會議摘要沒跑或不完整 | 看 `auto_minutes.json` 的 `reason` 與 `parts`；修好後 `auto_minutes.py "<檔名>_minutes" --force` |
 | 自動校正改錯了 | `transcript.md` 沒有被改動，可以直接用它；不想再自動校正就重新執行安裝程式加 `-NoCorrect` |
 | 對照表被自動寫入不想要的項目 | `corrections.py auto-undo "錯誤寫法"`（或 `--all`）；不想再自動寫入就把 `correction.corrections_auto.mode` 改回 `"off"` |

@@ -53,7 +53,7 @@ const SITE_URL = withTrailingSlash(process.env.PORTAL_SITE_URL || '')
 
 const SITE_TITLE = 'meeting-minutes'
 const SITE_DESCRIPTION =
-  '在自己的電腦上把會議錄音轉成逐字稿，再讓 Claude 整理成繁體中文會議記錄；音檔不上傳。支援 Windows 與 macOS（Apple Silicon）。'
+  '在自己的電腦上把會議錄音轉成逐字稿，再讓 AI 整理成繁體中文會議記錄；音檔不上傳。支援 Windows 與 macOS（Apple Silicon）。'
 const NOT_FOUND_DESCRIPTION = '找不到這個頁面，網址可能已經移除或改名。請回首頁，或從上方選單找你要的內容。'
 
 function withSlashes(value: string): string {

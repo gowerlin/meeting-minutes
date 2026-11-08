@@ -11,7 +11,7 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 
 | 用法 | 怎麼開始 | 誰來整理 | 適合 |
 |---|---|---|---|
-| [右鍵「傳送到」與拖放](/usage/send-to) | Windows：對錄音檔按右鍵 →「傳送到」→「會議轉寫（Pro）」；macOS：把錄音檔拖到「會議轉寫（Pro）」 | 轉寫完選擇讓程式自動做 AI 校正與會議摘要；也可以之後在 Claude 裡整理 | **大多數人**：不必打字，回答幾個問題就好 |
+| [右鍵「傳送到」與拖放](/usage/send-to) | Windows：對錄音檔按右鍵 →「傳送到」→「會議轉寫（Pro）」；macOS：把錄音檔拖到「會議轉寫（Pro）」 | 轉寫完選擇讓程式自動用 GPT（OpenAI）或 Claude（Anthropic）做 AI 校正與會議摘要；也可以之後在 Claude 裡整理 | **大多數人**：不必打字，回答幾個問題就好 |
 | [Claude CLI／Code 分頁](/usage/cli) | 跟 Claude 說「用 meeting-minutes-pro 整理 …」 | Claude 在對話中從頭做到尾，最後請你確認對照表 | 已經在用 Claude Code 的人 |
 | [Claude 桌面 App](/usage/claude-app) | 先用右鍵或拖放轉寫，再把逐字稿附到 App 對話裡 | Claude App（用上傳的 skill） | 平常用 Claude App 對話的人 |
 
@@ -21,7 +21,7 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 
 <StepFlow :steps="[
   { title: '轉寫（本機）', text: '轉檔、說話者分離、語音辨識、繁體轉換、對照表替換、分段標點、截圖。' },
-  { title: 'AI 校正（選用）', text: '把逐字稿文字（錄影另有最多 8 張截圖、背景說明與會議文件的名詞）送給 Claude 或 OpenAI，產出校正版逐字稿與對照表建議。' },
+  { title: 'AI 校正（選用）', text: '把逐字稿文字（錄影另有最多 8 張截圖、背景說明與會議文件的名詞）送給 GPT 或 Claude，產出校正版逐字稿與對照表建議。' },
   { title: '（選用）用會議記錄校稿確認', text: '在瀏覽器裡逐處確認 AI 校正，產出定稿逐字稿與字幕，常錯的詞匯入對照表（附屬工具，另外安裝）。' },
   { title: '整理（選用）', text: '會議記錄或課程、訪談等筆記，每一項附時間碼。' },
   { title: '你確認', text: '對照時間碼回聽決議與待辦；確認對照表建議，下次更準。' }
@@ -33,7 +33,7 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 
 | 檔案 | 用途 |
 |---|---|
-| `transcript.md` | 閱讀用逐字稿：時間碼、講者、畫面標記。交給 Claude 的就是這個 |
+| `transcript.md` | 閱讀用逐字稿：時間碼、講者、畫面標記。交給 AI 校正與整理的就是這個 |
 | `transcript.corrected.md` | 校正版逐字稿（有做 AI 校正時） |
 | `meeting-minutes.md` 或 `notes.md` | 會議記錄或筆記（有做會議摘要時） |
 | `meeting-minutes.html` 或 `notes.html` | 網頁版，用瀏覽器打開，時間碼點了播放（見[網頁版](/features/web)） |
