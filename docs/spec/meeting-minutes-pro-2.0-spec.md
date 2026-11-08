@@ -32,7 +32,7 @@
 ### 0.2 不做什麼
 
 - **本地 LLM**（GPU 評估的結論）：AI 校正與整理筆記的供應商維持 Claude／OpenAI；不加 `provider: local`、不偵測 Ollama。
-- sherpa-onnx CUDA（GPU 評估：比 CPU 慢 1.6～2.7 倍）；pyannote CPU（每小時 790 秒，比 sherpa CPU 慢）；macOS 的 pyannote（MPS）與 sherpa CoreML（未實測，§8.10）。
+- sherpa-onnx CUDA（GPU 評估，RTX 5060 Ti 16 GB 實測：每份素材都比 CPU 慢，自動判斷人數時講者也沒有分得比 CPU 版準）；pyannote CPU（每小時 790 秒，比 sherpa CPU 慢）；macOS 的 pyannote（MPS）與 sherpa CoreML（未實測，§8.10）。
 - 把畫面圖片送給模型（內容類型研究列為「可選的進一步做法」，2.x 再評估）。
 - 自訂 JSON schema 或 Markdown 版面的自訂範本（範本草案 § 0.1 C）。
 - 面試、醫療、法律、客服的內建類型（可用自訂範本 `base: meeting`／`requirements`，§3.8.7）。

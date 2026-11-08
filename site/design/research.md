@@ -85,7 +85,7 @@ description: 設計決定背後的實測方法：合成素材怎麼做、怎麼�
 
 ## GPU 與 CPU 說話者分離的取捨
 
-- **sherpa-onnx 改用 CUDA 反而比較慢**：比 CPU 慢 1.6～2.7 倍（舊版素材 M3，每小時錄音 575 秒對 210 秒），講者標籤也和 CPU 版有差異，所以 GPU 不走 sherpa。
+- **sherpa-onnx 改用 CUDA 反而比較慢**：RTX 5060 Ti 16 GB 實測，每份素材都比 CPU 慢；自動判斷人數時講者也從沒分得比 CPU 版好，多半更差（例：舊版素材 M3 比 CPU 版多判出 2 位講者），所以 GPU 不走 sherpa。
 - **pyannote（GPU）**：每小時錄音約 90 秒。M1、M3、CL1、IV1 自動判斷人數全對，講者混淆 ≤ 1.7%，GPU 記憶體峰值 2.7 GB。新素材重跑：M1、M3 仍是 4 位全對，講者混淆 1.0%／0.3%，每小時錄音約 90 秒。CPU 版的 pyannote 每小時要 790 秒，所以沒有 NVIDIA 顯示卡時用 sherpa CPU。
 - **代價**：選用套件約 5 GB；權重要用自己的 Hugging Face 帳號同意條件後下載（CC-BY-4.0）。
 - **座談預設 CPU**：加測時互有勝負。pyannote 把 PN1 的 5 人判成 4 人（11 秒的觀眾發言被併掉）、WS1 4 人判成 6 人；sherpa 門檻 0.8 時 PN1 5 位全對，而 pyannote 不能調門檻。
