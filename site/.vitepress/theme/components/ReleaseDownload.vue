@@ -4,26 +4,35 @@ import { useData } from 'vitepress'
 import type { ThemeConfig } from '../../config.mjs'
 
 // 下載區：版號、tag、附件與 SHA-256 讀 .vitepress/mm-release.json，網址前綴讀 themeConfig.releasesUrl。
-// product：pro／basic；compact：只顯示按鈕（首頁用）
-const props = withDefaults(defineProps<{ product?: 'pro' | 'basic'; compact?: boolean }>(), { product: 'pro', compact: false })
+// product：pro／basic／proofread（會議記錄校稿，只有安裝包）；compact：只顯示按鈕（首頁用）
+type Product = 'pro' | 'basic' | 'proofread'
+const props = withDefaults(defineProps<{ product?: Product; compact?: boolean }>(), { product: 'pro', compact: false })
 const { theme } = useData<ThemeConfig>()
+
+const TITLES: Record<Product, string> = {
+  pro: 'meeting-minutes-pro（Pro 版）',
+  basic: 'meeting-minutes（基本版）',
+  proofread: '會議記錄校稿（Pro 的附屬工具）'
+}
 
 const info = computed(() => {
   const r = theme.value.mmRelease
-  const pro = props.product === 'pro'
-  const tag = pro ? r.proTag : r.basicTag
-  const assets = (pro ? r.assets.pro : r.assets.basic).map(a => ({
+  const p = props.product
+  const tag = p === 'pro' ? r.proTag : p === 'basic' ? r.basicTag : r.proofreadTag
+  const list = p === 'pro' ? r.assets.pro : p === 'basic' ? r.assets.basic : r.assets.proofread
+  const assets = list.map(a => ({
     ...a,
     url: `${theme.value.releasesUrl}download/${tag}/${a.name}`,
     installer: a.name.endsWith('-installer.zip')
   }))
   return {
-    title: pro ? 'meeting-minutes-pro（Pro 版）' : 'meeting-minutes（基本版）',
-    version: pro ? r.proVersion : r.basicVersion,
-    releasedAt: r.releasedAt,
+    title: TITLES[p],
+    version: p === 'pro' ? r.proVersion : p === 'basic' ? r.basicVersion : r.proofreadVersion,
+    releasedAt: p === 'proofread' ? r.proofreadReleasedAt : r.releasedAt,
     releaseUrl: `${theme.value.releasesUrl}tag/${tag}`,
     installer: assets.find(a => a.installer),
     upload: assets.find(a => !a.installer),
+    proofread: p === 'proofread',
     assets
   }
 })
@@ -48,7 +57,8 @@ const info = computed(() => {
       <tbody>
         <tr v-for="a in info.assets" :key="a.name">
           <td><a :href="a.url"><code>{{ a.name }}</code></a></td>
-          <td v-if="a.installer">解開後執行 <code>install.cmd</code>（Windows）或 <code>install.command</code>（macOS）</td>
+          <td v-if="a.installer && info.proofread">先裝好 meeting-minutes-pro，再解開執行 <code>install.cmd</code>（Windows）或 <code>install.command</code>（macOS）</td>
+          <td v-else-if="a.installer">解開後執行 <code>install.cmd</code>（Windows）或 <code>install.command</code>（macOS）</td>
           <td v-else>只用 Claude 桌面 App 時，上傳這個檔當 skill（不要解開）</td>
           <td><code v-if="a.sha256" class="mm-sha">{{ a.sha256 }}</code><span v-else>發布時公布</span></td>
         </tr>

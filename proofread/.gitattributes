@@ -1,0 +1,5 @@
+# 會議記錄校稿：Windows 的 .cmd 必須是 CRLF（cmd.exe 遇到 LF 會讀錯標籤與續行）；其他文字檔沿用 repo 的 LF
+*.cmd text eol=crlf
+*.ps1 text eol=lf
+*.sh text eol=lf
+*.command text eol=lf

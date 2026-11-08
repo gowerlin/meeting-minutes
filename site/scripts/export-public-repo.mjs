@@ -13,13 +13,17 @@
 //   meeting-minutes-pro-skill/tests/**                         → pro/tests/**（不含 _out/、__pycache__/、音檔與影片）
 //   meeting-minutes-pro-skill/tools/*.py                       → pro/tools/
 //   meeting-minutes-skill/meeting-minutes-v<最新>/**           → basic/meeting-minutes-v<最新>/**
+//   meeting-minutes-proofread/meeting-minutes-proofread-v<最新>/** → proofread/meeting-minutes-proofread-v<最新>/**（附屬工具「會議記錄校稿」）
+//   meeting-minutes-proofread/tests/**                         → proofread/tests/**（不含 _out/、__pycache__/、.sonar/）
+//   meeting-minutes-proofread/tools/**                         → proofread/tools/**
+//   meeting-minutes-proofread/.gitattributes                   → proofread/.gitattributes（.cmd 要 CRLF）
 //   docs/spec/*.md                                             → docs/spec/
 //   site/repo-root/**                                          → 根目錄（README.md、LICENSE、THIRD-PARTY-NOTICES.md、
 //                                                                .gitignore、.gitattributes、.github/workflows/pages.yml）
 //   site/**（SITE_ALLOW 列出的）                                → site/**
 //
 // 1. 允許清單式複製：只帶上面對應得到的檔案；DENY 一律不帶（DENY 優先）；兩邊都沒列的也不帶，列在「未列入」
-// 2. 「最新」＝來源裡版號最高的版本目錄；要和 site/.vitepress/mm-release.json 的 proVersion、basicVersion 相同，
+// 2. 「最新」＝來源裡版號最高的版本目錄；要和 site/.vitepress/mm-release.json 的 proVersion、basicVersion、proofreadVersion 相同，
 //    EXPECTED 列出的檔案也都要在。--dry-run 只把缺項列出來；正式匯出有缺項就停止
 // 3. 複製後對 staging 跑 deid-scan.mjs --internal-ids（必須 0；zip 解開掃）。deid-scan 不收的非二進位檔複製成 .txt 補掃
 // 4. --out 不得在本 repo 內；已存在時必須是空目錄，或是公開 repo 的 clone（有 .git：除了 .git 全部換成這次匯出的內容，
@@ -41,6 +45,8 @@ const PRO_PARENT = 'meeting-minutes-pro-skill/'
 const PRO_PREFIX = 'meeting-minutes-pro-v'
 const BASIC_PARENT = 'meeting-minutes-skill/'
 const BASIC_PREFIX = 'meeting-minutes-v'
+const PROOFREAD_PARENT = 'meeting-minutes-proofread/'
+const PROOFREAD_PREFIX = 'meeting-minutes-proofread-v'
 
 // site/ 底下要帶的：確切檔案、目錄（結尾 /）；頁面 .md 另由 isSitePage 判斷
 const SITE_ALLOW_FILES = [
@@ -65,13 +71,14 @@ const DENY = [
   [PRO_PARENT + 'research/', '研究原型與原始數據，改寫成網站的研究方法頁'],
   [PRO_PARENT + 'dist/', '打包產物，Release 附件由 make_dist.py 重新產生'],
   [PRO_PARENT + 'tests/_out/', '測試輸出與合成音檔（音檔由講稿重建）'],
+  [PROOFREAD_PARENT + 'dist/', '打包產物，Release 附件由 tools/make_dist.py 重新產生'],
   ['spec/', '內部規格原檔；公開版規格放 docs/spec/'],
   ['_ct' + '-workorders/', '內部工單（字串拆開寫：這支腳本本身也會被去識別掃描）']
 ]
 const DENY_ANY_DIR = ['__pycache__/', '.sonar/', 'node_modules/', '_out/', 'venv/']
 const DENY_EXT = new Set(['.wav', '.mp3', '.mp4', '.m4a', '.opus', '.flac', '.7z'])
 
-// 必須帶到的檔（公開 repo 的路徑）。{PRO}、{BASIC} 換成 mm-release.json 的版號
+// 必須帶到的檔（公開 repo 的路徑）。{PRO}、{BASIC}、{PROOF} 換成 mm-release.json 的版號
 const EXPECTED = [
   ['README.md', 'S1-e'],
   ['LICENSE', 'S1-e'],
@@ -86,6 +93,22 @@ const EXPECTED = [
   ['docs/spec/meeting-minutes-pro-2.0-spec.md', 'S1-d（公開版規格）'],
   ['docs/spec/meeting-minutes-pro-2.1-spec.md', '2.1 公開版規格（網頁版）'],
   ['docs/spec/meeting-minutes-pro-2.2-spec.md', '2.2 公開版規格（參考資料、全文用字統一）'],
+  ['docs/spec/meeting-minutes-pro-2.3-spec.md', '2.3 公開版規格（配合會議記錄校稿）'],
+  ['docs/spec/meeting-minutes-proofread-1.0-spec.md', '會議記錄校稿 1.0 公開版規格'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/install.cmd', '會議記錄校稿（Windows 入口）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/install.ps1', '會議記錄校稿（Windows 安裝）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/install.sh', '會議記錄校稿（macOS 安裝）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/uninstall.ps1', '會議記錄校稿（Windows 移除，Pro 2.3 會呼叫）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/uninstall.sh', '會議記錄校稿（macOS 移除，Pro 2.3 會呼叫）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/README.md', '會議記錄校稿（說明）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/LICENSE', '會議記錄校稿（授權）'],
+  ['proofread/meeting-minutes-proofread-v{PROOF}/payload/app/mmproof_server.py', '會議記錄校稿（服務）'],
+  ['proofread/tests/run_tests.py', '會議記錄校稿（測試）'],
+  ['proofread/tools/make_dist.py', '會議記錄校稿（打包）'],
+  ['proofread/.gitattributes', '會議記錄校稿（.cmd 的 CRLF）'],
+  ['site/install/proofread.md', 'Portal：安裝會議記錄校稿'],
+  ['site/features/proofread.md', 'Portal：會議記錄校稿功能頁'],
+  ['site/usage/proofread.md', 'Portal：會議記錄校稿使用方法'],
   ['site/package.json', 'S1-e'],
   ['site/index.md', 'S1-e']
 ]
@@ -182,7 +205,7 @@ function isSitePage(rel) {
 }
 
 // 傳回 { kind: 'allow', dest } ／ { kind: 'deny', reason } ／ { kind: 'unlisted' }
-function makeClassifier(latestPro, latestBasic, oldPro, oldBasic) {
+function makeClassifier(latestPro, latestBasic, oldPro, oldBasic, latestProofread, oldProofread) {
   return p => {
     const reason = denyReason(p)
     if (reason) return { kind: 'deny', reason }
@@ -200,6 +223,14 @@ function makeClassifier(latestPro, latestBasic, oldPro, oldBasic) {
       const top = rel.split('/')[0]
       if (latestBasic && top === latestBasic) return { kind: 'allow', dest: 'basic/' + rel }
       if (oldBasic.includes(top)) return { kind: 'deny', reason: '舊版目錄（只帶最新版）' }
+      return { kind: 'unlisted' }
+    }
+    if (p.startsWith(PROOFREAD_PARENT)) {
+      const rel = p.slice(PROOFREAD_PARENT.length)
+      const top = rel.split('/')[0]
+      if (latestProofread && top === latestProofread) return { kind: 'allow', dest: 'proofread/' + rel }
+      if (oldProofread.includes(top)) return { kind: 'deny', reason: '舊版目錄（只帶最新版）' }
+      if (rel.startsWith('tests/') || rel.startsWith('tools/') || rel === '.gitattributes') return { kind: 'allow', dest: 'proofread/' + rel }
       return { kind: 'unlisted' }
     }
     if (/^docs\/spec\/[^/]+\.md$/.test(p)) return { kind: 'allow', dest: p }
@@ -250,7 +281,7 @@ function walkFiles(dir, rel = '') {
 }
 
 const kb = n => `${(n / 1024).toFixed(1)} KB`
-const area = dest => (dest.includes('/') ? (dest.startsWith('pro/') || dest.startsWith('basic/') ? dest.split('/').slice(0, 2).join('/') : dest.split('/')[0]) : '（根目錄）')
+const area = dest => (dest.includes('/') ? (/^(pro|basic|proofread)\//.test(dest) ? dest.split('/').slice(0, 2).join('/') : dest.split('/')[0]) : '（根目錄）')
 
 function runScan(args, targets, label) {
   const scan = spawnSync(
@@ -269,12 +300,15 @@ function main() {
   const basicDirs = versionDirs(source.paths, BASIC_PARENT, BASIC_PREFIX)
   const latestPro = proDirs.at(-1) ?? null
   const latestBasic = basicDirs.at(-1) ?? null
-  const classify = makeClassifier(latestPro, latestBasic, proDirs.slice(0, -1), basicDirs.slice(0, -1))
+  const proofreadDirs = versionDirs(source.paths, PROOFREAD_PARENT, PROOFREAD_PREFIX)
+  const latestProofread = proofreadDirs.at(-1) ?? null
+  const classify = makeClassifier(latestPro, latestBasic, proDirs.slice(0, -1), basicDirs.slice(0, -1), latestProofread, proofreadDirs.slice(0, -1))
 
   const release = JSON.parse(source.read('site/.vitepress/mm-release.json').toString('utf8'))
   const problems = []
   if (latestPro !== PRO_PREFIX + release.proVersion) problems.push(`Pro 最新版目錄是 ${latestPro ?? '（沒有）'}，mm-release.json 是 ${release.proVersion}（S1-a）`)
   if (latestBasic !== BASIC_PREFIX + release.basicVersion) problems.push(`基本版最新版目錄是 ${latestBasic ?? '（沒有）'}，mm-release.json 是 ${release.basicVersion}（S1-c）`)
+  if (latestProofread !== PROOFREAD_PREFIX + release.proofreadVersion) problems.push(`會議記錄校稿最新版目錄是 ${latestProofread ?? '（沒有）'}，mm-release.json 是 ${release.proofreadVersion ?? '（沒有）'}`)
 
   const groups = { allow: [], deny: [], unlisted: [] }
   for (const p of source.paths) {
@@ -284,12 +318,13 @@ function main() {
   for (const g of Object.values(groups)) g.sort((a, b) => (a.dest ?? a.p).localeCompare(b.dest ?? b.p))
 
   const dests = new Set(groups.allow.map(f => f.dest))
-  const missing = EXPECTED.map(([d, owner]) => [d.replace('{PRO}', release.proVersion).replace('{BASIC}', release.basicVersion), owner]).filter(([d]) => !dests.has(d))
+  const missing = EXPECTED.map(([d, owner]) => [d.replace('{PRO}', release.proVersion).replace('{BASIC}', release.basicVersion).replace('{PROOF}', release.proofreadVersion), owner]).filter(([d]) => !dests.has(d))
   for (const [d, owner] of missing) problems.push(`缺 ${d}（預期路徑；${owner}）`)
 
   console.log(`來源：${source.label}；來源根目錄 = site/ 的上一層`)
   console.log(`Pro 版本目錄：${proDirs.join('、') || '（沒有）'} → 帶 ${latestPro ?? '（沒有）'}`)
   console.log(`基本版版本目錄：${basicDirs.join('、') || '（沒有）'} → 帶 ${latestBasic ?? '（沒有）'}`)
+  console.log(`會議記錄校稿版本目錄：${proofreadDirs.join('、') || '（沒有）'} → 帶 ${latestProofread ?? '（沒有）'}`)
 
   console.log(`\n帶（${groups.allow.length}）：`)
   let total = 0

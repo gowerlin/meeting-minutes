@@ -556,7 +556,7 @@ class Reference(Tmp):
         refs.write_reference(self.out, ref)
         back = refs.read_reference(self.out)
         self.assertEqual(back, json.loads(json.dumps(ref, ensure_ascii=False)))
-        self.assertEqual(back["version"], "2.2.0")
+        self.assertEqual(back["version"], _testenv.VERSION)          # 〔2.3.0〕寫入的版本（原本寫死 2.2.0）
         self.assertEqual(back["sources"]["context"], [{"file": "週會-1103.context.md", "chars": 23}])
         self.assertEqual([(d["file"], d["status"]) for d in back["sources"]["docs"]],
                          [("週會-1103.筆記.md", "ok"), ("表.xlsx", "skipped")])

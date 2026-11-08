@@ -71,6 +71,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 "$MMH/venv/bin/python" "$MMH/scripts/auto_correct.py" "<檔名>_minutes" [--correct-model sonnet] [--correct-provider openai] [--force]
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" [--type <代號> | --template <代號>] [--openai | --claude] [--minutes-model opus] [--force]
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --render-only   # 改過 notes.json 後重新產生 notes.md
+"$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --source final --estimate-only   # 用定稿整理的費用估算（2.3，不呼叫模型、不寫檔）
 "$MMH/venv/bin/python" "$MMH/scripts/subtitles.py" "<檔名>_minutes" --corrected        # 改過校正版逐字稿後重新產生字幕
 "$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes"                   # 手改 .md 後重新產生網頁版（2.1）
 "$MMH/venv/bin/python" "$MMH/scripts/refs.py" plan "<檔名>_minutes" [--media <原始檔>]  # 會用到的說明檔、文件、截圖張數（2.2，不呼叫模型）
@@ -81,6 +82,8 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 ```
 
 已有結果時要加 `--force`，舊檔會先改名備份。
+
+`auto_minutes.py --source` 選要依據哪一份逐字稿（2.3）：`auto`（預設：有[會議記錄校稿](/features/proofread)的定稿 `transcript.final.md` 就用它，否則校正版、再否則原稿）、`final`（只用定稿，沒有就停下）、`corrected`、`original`。定稿比校正版舊時，`auto` 會改用校正版並印一行說明。`--estimate-only` 只算這次大約要送多少字、API 等價費用的區間，不呼叫模型、不寫任何檔；正式執行完成時，結果裡另有實際費用。
 
 ## 設定鍵（`config.json`）
 

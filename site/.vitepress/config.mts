@@ -16,9 +16,14 @@ export interface MmRelease {
   proTag: string
   basicVersion: string
   basicTag: string
-  /** 發布日（YYYY-MM-DD）；首次發布前是 null */
+  /** 發布日（YYYY-MM-DD）；首次發布前是 null。代表 Pro／基本版那一輪 */
   releasedAt: string | null
-  assets: { pro: ReleaseAsset[]; basic: ReleaseAsset[] }
+  /** 附屬工具「會議記錄校稿」的版號、tag、需要的 Pro 最低版本、發布日 */
+  proofreadVersion: string
+  proofreadTag: string
+  proofreadMinPro: string
+  proofreadReleasedAt: string | null
+  assets: { pro: ReleaseAsset[]; basic: ReleaseAsset[]; proofread: ReleaseAsset[] }
 }
 
 export interface ThemeConfig extends DefaultTheme.Config {
@@ -28,6 +33,8 @@ export interface ThemeConfig extends DefaultTheme.Config {
   repoUrl: string
   /** GitHub Releases 網址（結尾有 /）；下載連結＝releasesUrl＋download/<tag>/<檔名> */
   releasesUrl: string
+  /** 開發方式：協作開發用的兩個工具的 Portal（首頁「開發方式」與頁尾用） */
+  devTools: { bat: string; ct: string }
 }
 
 // ---------- 設定值 ----------
@@ -37,6 +44,9 @@ const MM_REPO = 'gowerlin/meeting-minutes'
 const MM_REPO_URL = `https://github.com/${MM_REPO}`
 // Releases 網址前綴：tag 規則 pro-v<Pro 版號>、basic-v<基本版版號>，新 tag 不必改這裡
 const MM_RELEASES_URL = `${MM_REPO_URL}/releases/`
+// 開發方式：本產品用 Better Agent Terminal（BAT）＋ Control Tower（CT）協作開發；兩個工具各自的 Portal
+const BAT_PORTAL_URL = 'https://gowerlin.github.io/better-agent-terminal/'
+const CT_PORTAL_URL = 'https://gowerlin.github.io/Control-Tower/'
 
 const BASE = withSlashes(process.env.PORTAL_BASE || '/')
 const SITE_URL = withTrailingSlash(process.env.PORTAL_SITE_URL || '')
@@ -62,7 +72,14 @@ function withTrailingSlash(value: string): string {
 function readRelease(): MmRelease {
   const file = new URL('./mm-release.json', import.meta.url)
   if (!fs.existsSync(file)) throw new Error('[config] 找不到 .vitepress/mm-release.json')
-  return JSON.parse(fs.readFileSync(file, 'utf8')) as MmRelease
+  const r = JSON.parse(fs.readFileSync(file, 'utf8')) as MmRelease
+  // 會議記錄校稿的欄位缺了就建站失敗（頁面的版號、下載與相容表都讀這幾個欄位）
+  for (const k of ['proofreadVersion', 'proofreadTag', 'proofreadMinPro', 'proofreadReleasedAt'] as const) {
+    if (!r[k]) throw new Error(`[config] mm-release.json 缺少 ${k}`)
+  }
+  if (r.proofreadTag !== 'proofread-v' + r.proofreadVersion) throw new Error('[config] mm-release.json 的 proofreadTag 與 proofreadVersion 不一致')
+  if (!r.assets?.proofread?.length) throw new Error('[config] mm-release.json 缺少 assets.proofread')
+  return r
 }
 
 // cleanUrls：faq.md → faq、install/index.md → install/、index.md → 首頁
@@ -94,6 +111,7 @@ const sidebar: DefaultTheme.Sidebar = {
       items: [
         { text: '安裝', link: '/install/' },
         { text: 'GPU 說話者分離（選用）', link: '/install/gpu' },
+        { text: '會議記錄校稿（選用）', link: '/install/proofread' },
         { text: 'Hugging Face 白話引導', link: '/install/hugging-face' },
         { text: '升級與解除安裝', link: '/install/upgrade' }
       ]
@@ -110,6 +128,7 @@ const sidebar: DefaultTheme.Sidebar = {
         { text: '網頁版', link: '/features/web' },
         { text: '參考資料', link: '/features/reference' },
         { text: '全文用字統一', link: '/features/consistency' },
+        { text: '會議記錄校稿（附屬工具）', link: '/features/proofread' },
         { text: '說話者分離與講者人數', link: '/features/diarization' },
         { text: 'AI 校正與會議摘要', link: '/features/ai-correction' },
         { text: '提升準確度', link: '/features/accuracy' },
@@ -123,6 +142,7 @@ const sidebar: DefaultTheme.Sidebar = {
       items: [
         { text: '總覽', link: '/usage/' },
         { text: '右鍵「傳送到」與拖放', link: '/usage/send-to' },
+        { text: '會議記錄校稿', link: '/usage/proofread' },
         { text: 'Claude CLI／Code 分頁', link: '/usage/cli' },
         { text: 'Claude 桌面 App', link: '/usage/claude-app' },
         { text: '手動執行與參數', link: '/usage/advanced' }
@@ -206,6 +226,7 @@ export default () => {
       mmRelease,
       repoUrl: MM_REPO_URL,
       releasesUrl: MM_RELEASES_URL,
+      devTools: { bat: BAT_PORTAL_URL, ct: CT_PORTAL_URL },
 
       logo: { src: '/logo.svg', alt: '' },
       siteTitle: '會議記錄 meeting-minutes',
@@ -216,7 +237,10 @@ export default () => {
       socialLinks: [{ icon: 'github', link: MM_REPO_URL, ariaLabel: 'GitHub' }],
 
       footer: {
-        message: `內容基準：meeting-minutes-pro ${mmRelease.proVersion}、基本版 meeting-minutes ${mmRelease.basicVersion}`,
+        message:
+          `內容基準：meeting-minutes-pro ${mmRelease.proVersion}、基本版 meeting-minutes ${mmRelease.basicVersion}、會議記錄校稿 ${mmRelease.proofreadVersion}<br>` +
+          `以 <a href="${BAT_PORTAL_URL}" target="_blank" rel="noreferrer">Better Agent Terminal</a> ＋ ` +
+          `<a href="${CT_PORTAL_URL}" target="_blank" rel="noreferrer">Control Tower</a> 協作開發`,
         copyright: 'MIT License'
       },
 

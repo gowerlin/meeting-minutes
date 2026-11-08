@@ -1,6 +1,6 @@
 ---
 title: 升級與解除安裝
-description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2 要注意什麼、升級時保留哪些檔，以及怎麼解除安裝。
+description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2、從 2.2 升級到 2.3 要注意什麼、升級時保留哪些檔，以及怎麼解除安裝（含會議記錄校稿）。
 ---
 
 # 升級與解除安裝
@@ -32,13 +32,22 @@ description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2 要注意什麼、升
 
 2.0.x → 2.1.x：重新執行安裝程式即可。多了[網頁版](/features/web)（`meeting-minutes.html`／`notes.html`），`config.json` 會補上 `html` 區塊；既有的設定、詞表、輸出檔與入口題目都不變。
 
-2.1.x → <MmVersion />：重新執行安裝程式即可，會自動安裝讀 PDF 用的 `pypdf`。`config.json` 會補上 `reference`、`consistency` 區塊（預設全開），既有的設定、詞表與輸出檔都不變。要注意的改變：
+2.1.x → 2.2.x：重新執行安裝程式即可，會自動安裝讀 PDF 用的 `pypdf`。`config.json` 會補上 `reference`、`consistency` 區塊（預設全開），既有的設定、詞表與輸出檔都不變。要注意的改變：
 
 1. **AI 校正會送出影片截圖**（最多 8 張，縮小後），用來補上與會者全名與會議日期；不想送：`config.json` 的 `reference.frames` 改成 `false`（見[參考資料](/features/reference)）。
 2. **入口可能多一題「背景說明（一行）」**：答應 AI 校正或摘要、而且錄音旁沒有說明檔時才問，直接按 Enter 跳過；不想被問：`reference.ask_context` 改成 `false`。
 3. **新檔案**：輸出資料夾可能多 `reference.json`、`context.md`；校正版與會議記錄裡同一個英文名詞的寫法會[統一](/features/consistency)。
 
-從 2.0.x 直接升到 <MmVersion /> 也只要重新執行一次安裝程式，上面兩段的改變都會一起套用。
+2.2.x → <MmVersion />：重新執行安裝程式即可。`config.json` 的設定鍵沒有變（只更新 `runtime_version`），入口題目、詞表與輸出檔都不變。改變的地方：
+
+1. **有定稿逐字稿時，會議摘要改用它**：用[會議記錄校稿](/features/proofread)定稿過的資料夾（有 `transcript.final.md`），重跑會議摘要時會依定稿整理，表頭寫「已人工校稿」。定稿比校正版舊（之後又重新轉寫或校正過）時，會改用校正版並印一行說明。
+2. **新指令參數**：`auto_minutes.py --source final`（指定用定稿）、`--estimate-only`（只估費用、不呼叫模型、不寫檔）；完成時的結果多了實際費用。見[手動執行與參數](/usage/advanced)。
+3. **解除安裝會一起移除會議記錄校稿**（有安裝的話），不會留下指向不存在檔案的右鍵選單。
+4. **Claude 桌面 App 請改上傳新版的上傳檔**（桌面上的 zip 已換成新版）。
+
+從 2.0.x 直接升到 <MmVersion /> 也只要重新執行一次安裝程式，上面各段的改變都會一起套用。
+
+會議記錄校稿的升級另外執行它自己的安裝程式，見[安裝會議記錄校稿 › 升級](/install/proofread#升級)。
 
 各版改了什麼見[更版紀錄](/releases)。
 
@@ -46,6 +55,7 @@ description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2 要注意什麼、升
 
 - **Windows**：雙擊安裝資料夾裡的 `uninstall.cmd`，或執行 `install.cmd -Uninstall`。
 - **macOS**：在 `uninstall.command` 上按右鍵 →「打開」，或在終端機執行 `./install.sh --uninstall`。
+- **裝了[會議記錄校稿](/install/proofread)時**：Pro 2.3.0 以上的解除安裝會自動先移除它。**Pro 2.2.x 請先移除會議記錄校稿**（執行它安裝包裡的 `uninstall.cmd`／`uninstall.command`），再移除 Pro。
 
 ### 會移除
 

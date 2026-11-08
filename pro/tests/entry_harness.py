@@ -55,6 +55,8 @@ END_ROW_NAMES = ("meeting-minutes.md", "meeting-minutes.html", "notes.md", "note
                  "corrections.suggested.tsv", "reference.json", "context.md", "transcript.md", "transcript.srt",
                  "transcript.cues.srt", "transcript.corrected.srt", "frames")
 V22 = _testenv.VER >= (2, 2, 0)          # 〔2.2.0〕參考資料
+# 〔2.3.0〕--hotwords 特殊字元（PowerShell 5.1 用 Native-Arg）。MMP_TEST_HOTWORDS_CONTROL=1：舊版也跑這個情境（對照組，預期 5.1 失敗）
+V23 = _testenv.VER >= (2, 3, 0) or os.environ.get("MMP_TEST_HOTWORDS_CONTROL") == "1"
 
 FAKE_TRANSCRIBE = r'''
 import json, os, shutil, sys, time
@@ -270,7 +272,23 @@ def scenarios():
         out.update(v21_scenarios())
     if V22:
         out.update(v22_scenarios())
+    if V23:
+        out.update(v23_scenarios())
     return out
+
+
+def v23_scenarios():
+    """〔2.3.0〕本次專有名詞（--hotwords）含雙引號、$HOME、反引號、%、&、管線符號、>、;、結尾反斜線，原樣傳到 transcribe.py
+    （PowerShell 5.1 的 Legacy 傳參數會弄壞 " 與結尾 \\；2.3.0 改用 Native-Arg，同 2.2.0 的 --context）。
+    答案順序：類型、人數、專有名詞、①、②、按 Enter 關閉。"""
+    hot = 'Kafka, 含 "引號" $HOME 與 `反引號` 100% & | > ; 結尾\\'
+    plain = "Kafka, Redis Sentinel, 星河物流"
+    return {
+        "hotwords_special_chars": (["claude", "codex"], 0, {}, None, ["", "", hot, "n", "n", ""],
+                                   [("calls", ["transcribe"]), ("targ2", "--hotwords", hot)]),
+        "hotwords_plain": (["claude", "codex"], 0, {}, None, ["", "", plain, "n", "n", ""],
+                           [("calls", ["transcribe"]), ("targ2", "--hotwords", plain)]),
+    }
 
 
 def v22_scenarios():

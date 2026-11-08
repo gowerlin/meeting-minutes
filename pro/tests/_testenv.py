@@ -1,4 +1,4 @@
-"""測試共用設定：把版本目錄（預設 v2.1.0；MMP_TEST_VERSION=2.0.2、1.2.2 等可改測舊版）的 scripts 放上 sys.path，
+"""測試共用設定：把版本目錄（預設＝最新的版本目錄；MMP_TEST_VERSION=2.2.0、1.2.2 等可改測舊版）的 scripts 放上 sys.path，
 並讓 MEETING_MINUTES_PRO_HOME 指向測試 home。
 
 測試一律不碰已安裝的 runtime：沒有設定 MEETING_MINUTES_PRO_HOME 時，自動建一個暫存目錄當測試 home。
@@ -10,7 +10,24 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-VERSION = os.environ.get("MMP_TEST_VERSION", "2.1.0")
+_DIR_PREFIX = "meeting-minutes-pro-v"
+
+
+def latest_version(root: Path = HERE.parent) -> str:
+    """〔2.3.0〕root 底下最新的版本目錄（meeting-minutes-pro-v<X.Y.Z>，依數字比較，不是字串）的版號。
+    公開 repo 只有最新版也能不帶 MMP_TEST_VERSION 直接跑；找不到任何版本目錄時丟 RuntimeError。"""
+    found = []
+    for p in root.iterdir() if root.is_dir() else []:
+        rest = p.name[len(_DIR_PREFIX):] if p.is_dir() and p.name.startswith(_DIR_PREFIX) else ""
+        parts = rest.split(".")
+        if len(parts) == 3 and all(x.isdigit() for x in parts):
+            found.append((tuple(int(x) for x in parts), rest))
+    if not found:
+        raise RuntimeError(f"{root} 底下沒有 {_DIR_PREFIX}<X.Y.Z> 版本目錄；用 MMP_TEST_VERSION 指定")
+    return max(found)[1]
+
+
+VERSION = os.environ.get("MMP_TEST_VERSION") or latest_version()   # 〔2.3.0〕預設改成最新的版本目錄（原本寫死 2.1.0）
 VER = tuple(int(x) for x in VERSION.split("."))
 # 〔1.2.2〕console 與輸出檔的分段單位：1.2.2 起「段」（「17 塊」在台灣易誤讀成 17 元），1.2.1 以前「塊」
 CHUNK_UNIT = "段" if VER >= (1, 2, 2) else "塊"

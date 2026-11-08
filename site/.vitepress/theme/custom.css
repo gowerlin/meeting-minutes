@@ -130,3 +130,65 @@
   border-top: 1px solid var(--vp-c-divider);
   padding-top: 24px;
 }
+
+/* 首頁：會議記錄校稿介紹（左文右圖，窄螢幕上下） */
+.mm-proofread {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin: 16px 0 8px;
+}
+@media (min-width: 960px) {
+  .mm-proofread {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 32px;
+  }
+}
+.mm-proofread-text p {
+  margin: 0 0 12px;
+  line-height: 1.75;
+}
+.mm-proofread-points {
+  list-style: none;
+  padding: 0 !important;
+  margin: 0 0 12px !important;
+  display: grid;
+  gap: 8px;
+}
+.mm-proofread-points li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 !important;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  font-weight: 600;
+}
+.mm-proofread-note {
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+}
+.mm-proofread .mm-download {
+  margin: 12px 0;
+}
+.mm-proofread-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.mm-proofread-shot {
+  margin: 0;
+}
+.mm-proofread-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--vp-c-divider);
+}
+.mm-proofread-shot figcaption {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}

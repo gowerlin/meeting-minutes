@@ -22,6 +22,13 @@
 
 兩版可以同時安裝，互不影響。
 
+## 附屬工具：會議記錄校稿
+
+Pro 的附屬工具，另外下載：在瀏覽器裡逐處確認 AI 校正的結果、直接改錯字、自動存檔，產出定稿逐字稿與字幕，常錯的詞勾選後匯入 Pro 的對照表。全部在本機執行，不上傳；需要 Pro 2.2.0 以上（「用定稿重做會議記錄」需要 2.3.0 以上）。
+
+- 下載：[Releases（proofread-v…）](https://github.com/gowerlin/meeting-minutes/releases)
+- 說明：[會議記錄校稿](https://gowerlin.github.io/meeting-minutes/features/proofread)、[安裝](https://gowerlin.github.io/meeting-minutes/install/proofread)
+
 ## 快速開始
 
 1. 到 [Releases](https://github.com/gowerlin/meeting-minutes/releases/latest) 下載 `…-installer.zip`（安裝包）。
@@ -38,12 +45,13 @@
 - 選用的 AI 校正與會議摘要會把**逐字稿文字**送到你選的供應商（Anthropic 或 OpenAI），每次都會先問、寫明要送什麼。
 - Pro 2.2 起，AI 校正另外送**影片截圖**（最多 8 張，縮小後）與你放的背景說明、會議文件的名詞和段落；會議摘要不送截圖；文件原檔不送。截圖可以在設定裡關掉（`reference.frames`）。
 - 不記錄逐字稿內容、金鑰與帳號資訊。
+- 會議記錄校稿只接受本機連線、不載入外部資源；只有選用的「用定稿重做會議記錄」會把定稿逐字稿送到 Pro 設定的供應商，而且先顯示預估費用、確認才送。
 
 ## 文件
 
 - 說明網站：<https://gowerlin.github.io/meeting-minutes/>（安裝、功能、使用方式、常見問題、[更版紀錄](https://gowerlin.github.io/meeting-minutes/releases)、[設計理念與研究方法](https://gowerlin.github.io/meeting-minutes/design/)）
 - 公開版規格：[`docs/spec/`](docs/spec/)
-- 各版的 README：`pro/meeting-minutes-pro-v<版號>/README.md`、`basic/meeting-minutes-v<版號>/README.md`
+- 各版的 README：`pro/meeting-minutes-pro-v<版號>/README.md`、`basic/meeting-minutes-v<版號>/README.md`、`proofread/meeting-minutes-proofread-v<版號>/README.md`
 
 ## 給開發者
 
@@ -52,6 +60,9 @@ pro/meeting-minutes-pro-v<版號>/   Pro 最新版（install.*、uninstall.*、R
 pro/tests/                         單元測試、計分程式、合成素材講稿
 pro/tools/make_dist.py             打包工具（產生 Release 的兩個 zip）
 basic/meeting-minutes-v<版號>/     基本版最新版
+proofread/meeting-minutes-proofread-v<版號>/   會議記錄校稿最新版
+proofread/tests/                   會議記錄校稿的測試（單元、整合、安裝、打包、瀏覽器）
+proofread/tools/make_dist.py       會議記錄校稿的打包工具
 docs/spec/                         公開版規格
 site/                              說明網站（VitePress）
 ```
@@ -59,8 +70,13 @@ site/                              說明網站（VitePress）
 - 跑測試：`cd pro/tests && python -B -m unittest -v`（見 [`pro/tests/README.md`](pro/tests/README.md)）。
 - 合成素材：repo 只放講稿，音檔用 `pro/tests/make_materials.py` 重建（需要網路、edge-tts 與 ffmpeg）。
 - 打包：`python pro/tools/make_dist.py`。
+- 會議記錄校稿：`MMPROOF_TEST_PRO_SCRIPTS=pro/meeting-minutes-pro-v<版號>/payload/runtime/scripts python -B proofread/tests/run_tests.py --only unit,server,dist,browser`（瀏覽器測試要 Playwright 與本機 Chrome；公開 repo 只有 Pro 最新版，有幾項以 Pro 2.2.x 為前提的測試會失敗，見 [給開發者](https://gowerlin.github.io/meeting-minutes/developer)）、打包 `python -B proofread/tools/make_dist.py`。
 - 網站：`cd site && npm ci && npm run build`。
 - 詳見 [給開發者](https://gowerlin.github.io/meeting-minutes/developer)。
+
+## 開發方式
+
+以 [Better Agent Terminal](https://gowerlin.github.io/better-agent-terminal/) ＋ [Control Tower](https://gowerlin.github.io/Control-Tower/) 協作開發：Control Tower 負責拆工單、派工與驗收紀錄，Better Agent Terminal 負責同時開多個 AI 工作分頁。
 
 ## 授權
 

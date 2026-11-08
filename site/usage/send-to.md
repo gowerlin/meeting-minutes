@@ -100,3 +100,4 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 
 - 有 `meeting-minutes.md`：打開 `meeting-minutes.html`（用瀏覽器），確認決議與待辦，點時間碼可以回聽。要補講者姓名或修改，把它和 `transcript.corrected.md` 附到 Claude，說「**用 meeting-minutes-pro 檢查這份會議記錄**」（見 [Claude 桌面 App](/usage/claude-app)）。
 - 有 `corrections.suggested.tsv`：看一下哪些建議是對的，加進[固定錯誤對照表](/features/accuracy#固定錯誤對照表)，下次會更準。
+- 接著校稿：對輸出資料夾按右鍵「傳送到 → 會議記錄校稿」，在瀏覽器裡逐處確認 AI 校正（見[用會議記錄校稿確認逐字稿](/usage/proofread)；要另外安裝[會議記錄校稿](/install/proofread)）。

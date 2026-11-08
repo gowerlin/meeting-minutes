@@ -115,6 +115,7 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
   1. 在 Windows 檔案總管對錄音檔按右鍵，會看到「傳送到 → 會議轉寫（Pro）」；macOS 的「應用程式」裡會有「會議轉寫（Pro）」（見[右鍵「傳送到」與拖放](/usage/send-to)）。
   2. 桌面上多了 `meeting-minutes-pro-skill-upload.zip`。到 Claude App 依序點「**自訂（Customize）** →「**Skills**」→「**＋**」→「**Create skill**」→「**Upload a skill**」，上傳這個 zip（**不要解開**）。
   3. App 要先在「設定 → Capabilities」開啟程式碼執行功能。
+- **想在瀏覽器裡逐處確認 AI 校正的結果**：另外安裝附屬工具[會議記錄校稿](/install/proofread)（選用，需要 Pro <MmVersion product="proofread-min-pro" /> 以上）。
 
 ::: danger 不要把安裝包上傳到 Claude App
 安裝包裡面還有 zip，Claude App 會擋下並顯示「Zip cannot contain nested zip files」。請上傳桌面上的 `meeting-minutes-pro-skill-upload.zip`，或 Release 的 `…-claude-app-upload.zip`（兩者內容相同）。
