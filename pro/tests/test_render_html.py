@@ -247,7 +247,13 @@ class H1Types(Base):
         self.assertEqual(p.returncode, 0, p.stderr.decode("utf-8", "replace")[-2000:])
         out = json.loads(p.stdout.decode("utf-8").strip().splitlines()[-1])
         name = out["output"]
-        self.assertEqual((ref / name).read_bytes(), (d / name).read_bytes(), f"{name} 與 2.0.2 不同")
+        want = (ref / name).read_bytes()
+        if _testenv.VER >= (2, 2, 0):
+            # 〔2.2.0〕規格 2.2.0 §9.1 刻意改寫的〈轉寫品質備註〉兩句（沒有參考資料時）；其餘仍須與 2.0.2 逐位元相同
+            want = want.replace("；只送逐字稿文字，沒有送截圖".encode(), "；只送逐字稿文字".encode()).replace(
+                "（只依時間對，先講後操作可能掛錯一步；畫面內容沒有送給模型）".encode(),
+                "（掛圖只依時間對，先講後操作可能掛錯一步；畫面內容沒有用來判斷步驟）".encode())
+        self.assertEqual(want, (d / name).read_bytes(), f"{name} 與 2.0.2 不同")
         self.assertFalse((ref / name).with_suffix(".html").exists())            # 2.0.2 沒有網頁版
 
     def test_all_types(self):
@@ -712,7 +718,7 @@ class H12Csp(Base):
     def test_footer_theme_and_write(self):
         page, _ = self.conv("# T\n\n## 節\n", name="meeting-minutes.md", theme="light")
         self.assertIn('data-theme="light"', page)
-        self.assertRegex(page, r"由 meeting-minutes-pro 2\.1\.0 從 <code>meeting-minutes\.md</code> 產生於 "
+        self.assertRegex(page, "由 meeting-minutes-pro " + re.escape(_testenv.VERSION) + r" 從 <code>meeting-minutes\.md</code> 產生於 "
                                r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d。內容以 meeting-minutes\.md 為準；改過 \.md 之後請重新產生網頁版。")
         raw = (self.tmp / "meeting-minutes.html").read_bytes()
         self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))

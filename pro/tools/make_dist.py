@@ -38,6 +38,10 @@ skill 內這兩檔由打包複製，不手改：
 
 `--sync-skill` 只更新版本目錄（不產生 dist/）；之後 `git add` 新檔再執行一次（不加 `--sync-skill`）產生發行檔。
 
+〔2.2.0〕參考資料（規格 2.2.0 §5.1、§10）：runtime 有 `payload/runtime/scripts/refs.py` 的 Pro 版本目錄另查
+① skill 內沒有 `refs.py`（Claude App 模式由 Claude 自己讀圖與文件，refs.py 不進上傳檔）；② `requirements.txt`、
+`requirements-mac.txt` 都有 `pypdf`。不符合就 exit 2，不產生檔案。
+
 只用 Python 標準函式庫；Windows／macOS 皆可執行，需要 `git` 指令。
 """
 
@@ -67,6 +71,9 @@ VERSION_RE = re.compile(r'^VERSION\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 FALLBACK_VERSION_RE = re.compile(r'^FALLBACK_VERSION\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 # 〔2.1.0〕skill 內由打包從 runtime 複製的檔（規格 2.1.0 §7.4；Claude App 沙盒執行 render_html.py 用）
 SKILL_SCRIPT_FILES = ("render_html.py", "html_template.html")
+# 〔2.2.0〕參考資料（規格 2.2.0 §5.1、§10）：refs.py 只在 runtime；PDF 抽取的套件寫在兩份 requirements
+REFS_SCRIPT = "refs.py"
+REFS_REQUIREMENTS = ("requirements.txt", "requirements-mac.txt")
 # (相對路徑, 版號樣式, 說明)：兩個產品共用
 OTHER_VERSIONS = (
     ("install.ps1", re.compile(r'^\$Version\s*=\s*"([^"]+)"', re.MULTILINE), "install.ps1 $Version"),
@@ -274,6 +281,32 @@ def check_skill_scripts(version_dir: Path, product: Product = PRO) -> list[str]:
     return list(SKILL_SCRIPT_FILES)
 
 
+def has_refs(version_dir: Path, product: Product = PRO) -> bool:
+    """〔2.2.0〕這個版本目錄有參考資料功能（runtime 有 refs.py）；基本版與 2.1.x 以前沒有。"""
+    return product.key == PRO.key and (runtime_scripts(version_dir) / REFS_SCRIPT).is_file()
+
+
+def check_refs(version_dir: Path, product: Product = PRO) -> list[str]:
+    """〔2.2.0〕參考資料（規格 2.2.0 §5.1、§10）：① refs.py 不進 skill（Claude App 上傳檔）；② requirements.txt、
+    requirements-mac.txt 都有 pypdf。沒有參考資料功能的版本目錄回傳 []（不查）；有就回傳檢查過的項目。"""
+    if not has_refs(version_dir, product):
+        return []
+    errors = []
+    skill_dir = version_dir / product.skill_dir
+    found = sorted(p.relative_to(skill_dir).as_posix() for p in skill_dir.rglob(REFS_SCRIPT)) if skill_dir.is_dir() else []
+    if found:
+        errors.append(f"skill 內有 {', '.join(found)}：refs.py 只放 runtime，不進 Claude App 上傳檔（規格 2.2.0 §10）")
+    for name in REFS_REQUIREMENTS:
+        req = version_dir / "payload" / "runtime" / name
+        if not req.is_file():
+            errors.append(f"找不到 payload/runtime/{name}")
+        elif not re.search(r"^\s*pypdf\b", req.read_text(encoding="utf-8"), re.MULTILINE | re.IGNORECASE):
+            errors.append(f"payload/runtime/{name} 沒有 pypdf（PDF 會議文件的抽取要用）")
+    if errors:
+        raise DistError("參考資料檔案檢查失敗：\n  - " + "\n  - ".join(errors))
+    return [f"skill 內沒有 {REFS_SCRIPT}"] + [f"{n} 有 pypdf" for n in REFS_REQUIREMENTS]
+
+
 def build_upload_zip(skill_dir: Path, dest: Path, upload_root: str = UPLOAD_ROOT) -> list[str]:
     """payload 的上傳用 zip：skill 目錄的所有檔（不含 __pycache__、zip），依路徑排序，根目錄 upload_root。"""
     files = sorted(p for p in skill_dir.rglob("*")
@@ -436,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
         version = read_version(version_dir, product)
         check_no_weights(version_dir)
         html_checked = check_skill_scripts(version_dir, product)
+        refs_checked = check_refs(version_dir, product)
         files = tracked_files(version_dir)
         upload_src = version_dir / product.payload_zip
         upload_names = check_upload_zip(upload_src, version_dir / product.skill_dir, product.upload_root)
@@ -472,6 +506,8 @@ def main(argv: list[str] | None = None) -> int:
     if html_checked:
         print(f"網頁版（H-13）：render_html.py FALLBACK_VERSION＝common.py VERSION；skill 內 scripts/ 的 "
               f"{'、'.join(html_checked)} 與 runtime 逐位元相同")
+    if refs_checked:
+        print(f"參考資料（2.2.0）：{'；'.join(refs_checked)}")
     print(f"{installer_name}：{len(files)} 檔，{installer.stat().st_size:,} bytes，sha256 {sha256_of(installer)}")
     print(f"{upload_name}：{len(upload_names)} 項（無巢狀 zip），{upload.stat().st_size:,} bytes，sha256 {sha256_of(upload)}")
     print(f"README.txt 與 .sha256 已寫入 {dist_dir}")

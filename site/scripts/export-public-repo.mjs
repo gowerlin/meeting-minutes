@@ -85,6 +85,7 @@ const EXPECTED = [
   ['basic/meeting-minutes-v{BASIC}/THIRD-PARTY-NOTICES.md', 'S1-c（基本版補 NOTICES）'],
   ['docs/spec/meeting-minutes-pro-2.0-spec.md', 'S1-d（公開版規格）'],
   ['docs/spec/meeting-minutes-pro-2.1-spec.md', '2.1 公開版規格（網頁版）'],
+  ['docs/spec/meeting-minutes-pro-2.2-spec.md', '2.2 公開版規格（參考資料、全文用字統一）'],
   ['site/package.json', 'S1-e'],
   ['site/index.md', 'S1-e']
 ]

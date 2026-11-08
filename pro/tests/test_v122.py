@@ -447,6 +447,7 @@ def _snippet_sh() -> str:
 # 〔2.0.0 規格 §9.1〕從 1.x 升級時 upgrade_config() 另補 2.0 的五個區塊（1.2.2 目錄測試時是空的）
 V2_KEYS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] if _testenv.VER >= (2, 0, 0) else []
 V2_KEYS += ["html"] if _testenv.VER >= (2, 1, 0) else []      # 〔2.1.0〕upgrade_config() 另補 html 區塊（規格 2.1.0 §6.1）
+V2_KEYS += ["reference", "consistency"] if _testenv.VER >= (2, 2, 0) else []  # 〔2.2.0〕另補 reference 區塊（規格 2.2.0 §8.1）與 consistency（全文用字統一）
 
 
 @unittest.skipUnless(V122, "1.2.2 才有")

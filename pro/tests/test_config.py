@@ -241,8 +241,10 @@ def mock_argv(argv):
 # 〔2.0.0〕U-1（規格 §9.1、§10.2）：1.0.0／1.1.0／1.2.2 的 config.json 經 upgrade_config()
 V2 = _testenv.VER >= (2, 0, 0)
 V21 = _testenv.VER >= (2, 1, 0)
-# 〔2.1.0〕升級時另補 html 區塊（規格 2.1.0 §6.1）；2.0.x 只補 2.0 的五塊
-V2_BLOCKS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] + (["html"] if V21 else [])
+V22 = _testenv.VER >= (2, 2, 0)
+# 〔2.1.0〕升級時另補 html 區塊（規格 2.1.0 §6.1）；2.0.x 只補 2.0 的五塊；〔2.2.0〕另補 reference 區塊（規格 2.2.0 §8.1）
+V2_BLOCKS = ["content_type", "diarization", "keyframes", "content_types", "subtitles"] + (["html"] if V21 else []) + \
+    (["reference", "consistency"] if V22 else [])   # 〔2.2.0〕consistency：全文用字統一
 V110_CONFIG = dict(copy.deepcopy(V100_CONFIG), runtime_version="1.1.0",
                    punctuation={"enabled": True, "model": "ct-transformer-int8", "paragraph_gap": 2.5,
                                 "paragraph_max_chars": 200, "whisper_density": 20},
@@ -285,7 +287,7 @@ class UpgradeTo200(TempHome):
         added = common.added_config_keys(V122_CONFIG, after)
         msg = "config.json 已補上新版設定鍵：{0}（既有的值不變）".format("、".join(added))
         self.assertEqual(msg, "config.json 已補上新版設定鍵：content_type、diarization、keyframes、content_types、subtitles"
-                         + ("、html" if V21 else "") + "（既有的值不變）")
+                         + ("、html" if V21 else "") + ("、reference、consistency" if V22 else "") + "（既有的值不變）")
 
     def test_partial_blocks(self):
         before = dict(copy.deepcopy(V122_CONFIG), runtime_version="2.0.0",
@@ -342,7 +344,7 @@ class UpgradeTo210(TempHome):
         after = self.upgrade(copy.deepcopy(before))
         self.assertEqual(after["html"], common.DEFAULTS["html"])
         self.assertIs(after["html"]["enabled"], True)                          # 〔2.1.0〕升級上來的使用者也預設產出（規格 2.1.0 §6.1）
-        self.assertEqual(after["runtime_version"], "2.1.0")
+        self.assertEqual(after["runtime_version"], _testenv.VERSION)
         self.assertIn("html", common.added_config_keys(before, after))
 
     def test_partial_keys(self):

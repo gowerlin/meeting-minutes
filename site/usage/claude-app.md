@@ -43,7 +43,12 @@ Claude App 裡的 skill 在雲端的沙盒中執行，用不到你電腦的顯�
 
 ### 轉寫時沒有做會議摘要
 
-1. 附上 `transcript.md`（有 AI 校正時附 `transcript.corrected.md`）；影片可以一併附上 `frames` 資料夾裡的截圖。
+1. 附上 `transcript.md`（有 AI 校正時附 `transcript.corrected.md`）。想讓 Claude 補上與會者全名與會議日期，可以一併附上：
+   - 有 `reference.json`（本機 AI 校正時已從截圖整理過）：附它就好，不必再附截圖。
+   - 沒有：附 `frames` 資料夾裡的截圖（片頭、與會者畫面，最多看 8 張），或會議文件（PDF、PPTX、DOCX、TXT、MD）。
+   - 也可以在對話開頭用一句話說明會議，例「這是 X 專案週會，與會者 A、B」。
+
+   人名與名詞的寫法以這些資料為準，內容以逐字稿為準（見[參考資料](/features/reference#claude-桌面-app)）。
 2. 說：
 
    > **用 meeting-minutes-pro 整理成會議記錄，並產生校正版逐字稿**

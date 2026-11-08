@@ -15,7 +15,8 @@
 | 固定錯誤對照表、校正版逐字稿、Breeze-ASR-25 | — | ✅ |
 | 轉寫後自動 AI 校正與會議摘要（Claude／OpenAI，選用） | — | ✅ |
 | 7 種內容類型（會議、課程、訪談、操作教學、座談、工作坊、需求訪談）、自訂範本 | — | ✅ |
-| 字幕、GPU 說話者分離（選用）、執行 log 與費用 | — | ✅ |
+| 字幕、網頁版、GPU 說話者分離（選用）、執行 log 與費用 | — | ✅ |
+| AI 校正參考影片截圖與會議文件、全文用字統一 | — | ✅ |
 | 下載 | [Releases（basic-v…）](https://github.com/gowerlin/meeting-minutes/releases) | [Releases（pro-v…，Latest）](https://github.com/gowerlin/meeting-minutes/releases/latest) |
 | 說明 | [基本版](https://gowerlin.github.io/meeting-minutes/basic) | [功能總覽](https://gowerlin.github.io/meeting-minutes/features/) |
 
@@ -34,7 +35,8 @@
 ## 隱私
 
 - 語音辨識、說話者分離、分段標點都在本機完成，音檔不會上傳。
-- 選用的 AI 校正與會議摘要只把**逐字稿文字**送到你選的供應商（Anthropic 或 OpenAI），每次都會先問。
+- 選用的 AI 校正與會議摘要會把**逐字稿文字**送到你選的供應商（Anthropic 或 OpenAI），每次都會先問、寫明要送什麼。
+- Pro 2.2 起，AI 校正另外送**影片截圖**（最多 8 張，縮小後）與你放的背景說明、會議文件的名詞和段落；會議摘要不送截圖；文件原檔不送。截圖可以在設定裡關掉（`reference.frames`）。
 - 不記錄逐字稿內容、金鑰與帳號資訊。
 
 ## 文件

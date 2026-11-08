@@ -815,6 +815,59 @@ def _cli():
         raise SystemExit(__doc__)
 
 
+
+@unittest.skipUnless(_testenv.VER >= (2, 2, 0), "2.2.0 才有")
+class TranscribeRefFlags(TranscribeWiring):
+    """〔2.2.0〕transcribe.py 的參考資料旗標（規格 2.2.0 §7.3）：原樣轉給接著執行的校正；沒給時呼叫方式與 2.1.0 相同；
+    沒有校正時 --context 仍寫 context.md、其他旗標只提示。假 ASR／分離、假 auto_correct.run（不呼叫模型）。"""
+
+    test_cues_after_outputs = test_no_cues_flag_and_config = test_subtitle_failure_does_not_break_transcription = None  # 只借用環境
+
+    def setUp(self):
+        super().setUp()
+        import auto_correct
+        self.ac = auto_correct
+        self._ac_run = auto_correct.run
+        self.calls = []
+
+        def fake_run(out_dir, req=None, **kw):
+            self.calls.append({"out_dir": out_dir, "kw": kw})
+            return {"status": "skipped", "reason": "fake", "provider": None, "model": None, "channel": None,
+                    "chunks": 0, "chunks_ok": 0, "fallback": None}
+        auto_correct.run = fake_run
+
+    def tearDown(self):
+        self.ac.run = self._ac_run
+        super().tearDown()
+
+    def test_no_flags_same_call_as_210(self):
+        res, err, out = self.main("--correct")
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(sorted(self.calls[0]["kw"]), ["cfg", "consent", "in_pipeline", "interactive", "run_log"])
+        self.assertFalse((out / "context.md").exists())
+
+    def test_flags_forwarded(self):
+        doc = self.tmp / "議程.pdf"
+        res, err, out = self.main("--correct", "--context", "示範週會，主持人陳怡君", "--refs", str(doc), "--refs", "refs2",
+                                  "--no-context", "--no-frames")
+        self.assertEqual(self.calls[0]["kw"]["refs_opts"], {"context": "示範週會，主持人陳怡君", "refs": [str(doc), "refs2"],
+                                                            "no_refs": False, "no_context": True, "no_frames": True})
+        res, err, out = self.main("--claude", "--no-refs")                  # 捷徑也會校正
+        self.assertEqual(self.calls[1]["kw"]["refs_opts"], {"context": None, "refs": [], "no_refs": True,
+                                                            "no_context": False, "no_frames": False})
+
+    def test_without_correct(self):
+        res, err, out = self.main("--context", "示範週會\n第二行", "--no-frames")
+        self.assertEqual(self.calls, [])
+        ctx = (out / "context.md").read_text(encoding="utf-8")
+        self.assertTrue(ctx.startswith("---\nsource: entry\n") and ctx.endswith("---\n示範週會\n"))
+        self.assertIn("背景說明已存成 context.md", err)
+        self.assertIn("--refs／--no-refs／--no-context／--no-frames 只在 AI 校正時使用；這次沒有做 AI 校正", err)
+        res, err, out = self.main()
+        self.assertFalse((out / "context.md").exists())
+        self.assertNotIn("只在 AI 校正時使用", err)
+        self.assertNotIn("背景說明", err)
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] in ("map", "rules", "timing", "derive"):
         _cli()

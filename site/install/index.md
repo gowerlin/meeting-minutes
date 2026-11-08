@@ -100,7 +100,7 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
      自動校正（選用）
      - 偵測：claude CLI 已找到…
      - 偵測：codex CLI  已找到…，登入：是（ChatGPT 帳號）
-     - 將使用：OpenAI（gpt-6.1-sol，透過 Codex）。開啟後，逐字稿文字會送到 OpenAI（音檔與截圖不會）
+     - 將使用：OpenAI（gpt-6.1-sol，透過 Codex）。開啟後，逐字稿文字與影片截圖會送到 OpenAI（音檔不會；要關掉截圖：config 的 reference.frames 改成 false）
      是否開啟自動校正？[y/N]
    ```
 

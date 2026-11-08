@@ -6,6 +6,8 @@
 - 〔2.1.0〕H-13（規格 2.1.0 §9.1）：`render_html.FALLBACK_VERSION`＝`common.VERSION`、skill 內 `scripts/` 兩檔與 runtime
   逐位元相同，不符合 exit 2（不動 dist/）；沒有網頁版的版本目錄與基本版不查；`--sync-skill` 複製兩檔並重產 payload zip；
   真的 2.1.0 版本目錄通過檢查。
+- 〔2.2.0〕參考資料（規格 2.2.0 §5.1、§10）：runtime 有 refs.py 的版本目錄另查 skill 內沒有 refs.py、兩份 requirements
+  都有 pypdf，不符合 exit 2；沒有 refs.py 的版本目錄與基本版不查；真的 2.2.0 版本目錄通過檢查。
 
 只在暫存目錄建假的版本目錄，不寫 dist/、不呼叫 git 以外的任何外部程式、不呼叫模型。
 """
@@ -354,6 +356,65 @@ class RealHtmlVersionDir(unittest.TestCase):
         self.assertEqual(make_dist.check_skill_scripts(vd), list(make_dist.SKILL_SCRIPT_FILES))
         names = make_dist.check_upload_zip(vd / make_dist.PRO.payload_zip, vd / make_dist.PRO.skill_dir)
         self.assertIn("meeting-minutes-pro/scripts/render_html.py", names)
+
+
+class RefsCheck(unittest.TestCase):
+    """〔2.2.0〕參考資料（規格 2.2.0 §5.1、§10）：refs.py 不進 skill；兩份 requirements 都有 pypdf。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.vd = make_version_dir(Path(self.tmp.name))
+        rt = self.vd / "payload" / "runtime"
+        (rt / "scripts" / "refs.py").write_text("# refs\n", encoding="utf-8")
+        for name in make_dist.REFS_REQUIREMENTS:
+            (rt / name).write_text("numpy\npypdf>=6\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def fails(self, *frags):
+        with self.assertRaises(make_dist.DistError) as cm:
+            make_dist.check_refs(self.vd)
+        for f in frags:
+            self.assertIn(f, str(cm.exception))
+
+    def test_passes(self):
+        self.assertTrue(make_dist.has_refs(self.vd))
+        self.assertEqual(len(make_dist.check_refs(self.vd)), 1 + len(make_dist.REFS_REQUIREMENTS))
+
+    def test_without_refs_not_checked(self):
+        (self.vd / "payload" / "runtime" / "scripts" / "refs.py").unlink()
+        self.assertFalse(make_dist.has_refs(self.vd))
+        self.assertEqual(make_dist.check_refs(self.vd), [])
+
+    def test_refs_in_skill_fails(self):
+        d = self.vd / make_dist.PRO.skill_dir / "scripts"
+        d.mkdir(parents=True)
+        (d / "refs.py").write_text("# refs\n", encoding="utf-8")
+        self.fails("scripts/refs.py", "不進 Claude App 上傳檔")
+
+    def test_requirements_without_pypdf_fails(self):
+        (self.vd / "payload" / "runtime" / "requirements-mac.txt").write_text("numpy\n", encoding="utf-8")
+        self.fails("requirements-mac.txt 沒有 pypdf")
+        (self.vd / "payload" / "runtime" / "requirements.txt").unlink()
+        self.fails("找不到 payload/runtime/requirements.txt")
+
+    def test_main_exit_2(self):
+        (self.vd / "payload" / "runtime" / "requirements.txt").write_text("numpy\n", encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            code = make_dist.main([str(self.vd), "--out-dir", str(Path(self.tmp.name) / "out")])
+        self.assertEqual(code, 2)
+        self.assertIn("參考資料檔案檢查失敗", err.getvalue())
+        self.assertFalse((Path(self.tmp.name) / "out").exists())
+
+    def test_basic_not_checked(self):
+        self.assertFalse(make_dist.has_refs(self.vd, make_dist.BASIC))
+
+
+@unittest.skipUnless(make_dist.has_refs(_testenv.VERSION_DIR), "測試的版本目錄沒有參考資料功能（2.1.x 以前）")
+class RealRefsVersionDir(unittest.TestCase):
+    def test_real_version_dir(self):
+        self.assertEqual(len(make_dist.check_refs(_testenv.VERSION_DIR)), 1 + len(make_dist.REFS_REQUIREMENTS))
 
 
 @unittest.skipUnless(make_dist.BASIC.root().is_dir(), "沒有基本版目錄")

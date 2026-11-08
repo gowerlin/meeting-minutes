@@ -58,9 +58,12 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `--no-opencc`、`--no-opencc-keep` | 不做簡繁轉換；不套用 OpenCC 詞彙回復表 |
 | `--no-punct`、`--paragraph-gap SEC`、`--paragraph-max-chars N` | 關閉分段標點；停頓幾秒換段（預設 2.0）；滿幾字換段（預設 200） |
 | `--no-cues` | 這次不產生 `transcript.cues.srt` |
-| `--correct`／`--no-correct` | 這次開／關自動校正（`--correct` 代表你同意送出逐字稿文字） |
+| `--correct`／`--no-correct` | 這次開／關自動校正（`--correct` 代表你同意送出逐字稿文字與[參考資料](/features/reference)） |
 | `--claude`／`--openai` | 這次用 Claude／OpenAI 自動校正 |
 | `--correct-model M`、`--correct-effort E`、`--correct-channel cli\|api` | 這次的模型、推理強度、通道 |
+| `--context "<一行>"` | 背景說明一行，寫進 `<檔名>_minutes/context.md`（已有就覆寫，舊檔改名備份）；`auto_correct.py`、`auto_minutes.py` 也有（2.2） |
+| `--refs <檔或資料夾>` | 另外加入會議文件（PDF、PPTX、DOCX、TXT、MD；可重複）；三支程式都有（2.2） |
+| `--no-refs`、`--no-context`、`--no-frames` | 這次不讀會議文件、不讀背景說明、不送截圖（`--no-frames` 只有 `transcribe.py`、`auto_correct.py`；見[參考資料](/features/reference#怎麼關)）（2.2） |
 
 ## 事後補做
 
@@ -70,6 +73,9 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 "$MMH/venv/bin/python" "$MMH/scripts/auto_minutes.py" "<檔名>_minutes" --render-only   # 改過 notes.json 後重新產生 notes.md
 "$MMH/venv/bin/python" "$MMH/scripts/subtitles.py" "<檔名>_minutes" --corrected        # 改過校正版逐字稿後重新產生字幕
 "$MMH/venv/bin/python" "$MMH/scripts/render_html.py" "<檔名>_minutes"                   # 手改 .md 後重新產生網頁版（2.1）
+"$MMH/venv/bin/python" "$MMH/scripts/refs.py" plan "<檔名>_minutes" [--media <原始檔>]  # 會用到的說明檔、文件、截圖張數（2.2，不呼叫模型）
+"$MMH/venv/bin/python" "$MMH/scripts/refs.py" show "<檔名>_minutes"                     # reference.json 的摘要（2.2）
+"$MMH/venv/bin/python" "$MMH/scripts/consistency.py" "<檔名>_minutes" [--dry-run]       # 全文用字統一（2.2，不呼叫模型）
 "$MMH/venv/bin/python" "$MMH/scripts/templates.py" check                              # 檢查自訂範本
 "$MMH/venv/bin/python" "$MMH/scripts/runlog.py" summary                               # 執行 log 彙整
 ```
@@ -111,6 +117,13 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `subtitles.uncertain` | `orig` | 待確認的字在字幕裡怎麼顯示：`orig`／`guess`／`mark` |
 | `subtitles.max_line_chars`／`.max_lines`／`.min_sec`／`.max_sec`／`.max_cps` | `16`／`2`／`0.833`／`7.0`／`9` | 字幕規則 |
 | `html.enabled`／`.media`／`.theme` | `true`／`auto`／`dark` | [網頁版](/features/web)：是否產生、是否放播放器（`off`＝時間碼一律文字）、第一次開啟的主題（2.1） |
+| `reference.frames` | `true` | [參考資料](/features/reference)：AI 校正時送影片截圖（2.2） |
+| `reference.max_frames`／`.frame_max_px` | `8`／`1280` | 截圖最多幾張、縮到長邊幾 px（`max_frames: 0` 等於不送）（2.2） |
+| `reference.docs`／`.context` | `true`／`true` | 讀會議文件／讀說明檔與 `context.md`（2.2） |
+| `reference.ask_context` | `true` | 入口問一行背景說明（`false`＝不問，檔案照讀）（2.2） |
+| `reference.terms_max_chars`／`.paragraphs_max_chars` | `1500`／`4000` | 送出的文件名詞、段落字數上限（2.2） |
+| `reference.doc_max_files`／`.doc_max_mb`／`.pdf_max_pages` | `10`／`50`／`200` | 文件份數、單檔大小、PDF 頁數上限（2.2） |
+| `consistency.enabled` | `true` | [全文用字統一](/features/consistency)（本機處理，不呼叫模型）（2.2） |
 
 ## 安裝程式的參數
 

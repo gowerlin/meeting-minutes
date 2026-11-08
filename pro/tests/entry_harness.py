@@ -16,9 +16,19 @@
   v21_scenarios：可點播放／時間碼為文字的說明、非會議類型、設定關閉、失敗的黃字、沒整理時不列；2.0.2 config 升級（upgraded_202）。
   檢查 `rows`：結束畫面的檔案列（依序）；1.x／2.0.x 升級的情境在 2.1.0 只多 `.html` 一列（測 2.0.2 時同一份清單去掉 `.html`）。
 
+- 〔2.2.0〕參考資料（規格 2.2.0 §7.1、§7.2、§11.5）：假 runtime 多放真的 refs.py（入口用 `refs.py plan` 算截圖與文件數）；
+  假 auto_correct.py／auto_minutes.py 收到 `--context` 時照真的程式寫 `context.md`（refs.write_context）；`FAKE_KEYFRAMES=N`
+  讓假轉寫產生 N 張截圖與 keyframes；`FAKE_REFERENCE=1` 讓假校正寫 `reference.json`（含讀不到的文件）。
+  1.x～2.1 的情境在 2.2.0 自動在媒體旁放 `meet.context.md`（入口印「背景說明：沿用」、不多問一題，答案與檢查不變）；
+  v22_scenarios：有說明檔不問、沒有則問一行、只答應摘要時在摘要問、兩步都答否不問、`context.md` 重跑沿用、
+  Enter 跳過、`ask_context: false`、特殊字元原樣傳、多個檔各問一次、詢問行的送出內容、結束畫面的 reference.json／context.md。
+  另有「貼上兩行」的真主控台測試（`paste_*`，不經 stdin 管線）：PowerShell 7／5.1 在隱藏的新主控台用 WriteConsoleInput
+  模擬貼上兩行，確認 Ask-Context 讀完第一行後清掉第二行；bash 在 WSL 的 pty 實測（沒有 WSL 或 MMP_TEST_NO_WSL 時略過）。
+
 用法：python entry_harness.py --work <暫存目錄> [--shell pwsh powershell bash] [--only 情境名 ...]
 """
 import argparse
+import ctypes
 import json
 import os
 import shutil
@@ -42,8 +52,9 @@ ERROR_MARKERS = ("CategoryInfo", "FullyQualifiedErrorId", "Get-Content", "Select
 V21 = _testenv.VER >= (2, 1, 0)          # 〔2.1.0〕網頁版
 # 結束畫面列的檔名（兩支入口的清單，依序）；rows 檢查只看這些
 END_ROW_NAMES = ("meeting-minutes.md", "meeting-minutes.html", "notes.md", "notes.html", "notes.json", "transcript.corrected.md",
-                 "corrections.suggested.tsv", "transcript.md", "transcript.srt", "transcript.cues.srt",
-                 "transcript.corrected.srt", "frames")
+                 "corrections.suggested.tsv", "reference.json", "context.md", "transcript.md", "transcript.srt",
+                 "transcript.cues.srt", "transcript.corrected.srt", "frames")
+V22 = _testenv.VER >= (2, 2, 0)          # 〔2.2.0〕參考資料
 
 FAKE_TRANSCRIBE = r'''
 import json, os, shutil, sys, time
@@ -63,6 +74,14 @@ for n in ("transcript.md", "transcript.json", "transcript.srt"):
 if os.environ.get("FAKE_META"):
     doc = json.loads((out / "transcript.json").read_text(encoding="utf-8"))
     doc.setdefault("meta", {}).update(json.loads(os.environ["FAKE_META"]))
+    (out / "transcript.json").write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+if os.environ.get("FAKE_KEYFRAMES"):                   # 〔2.2.0〕截圖（入口的 refs.py plan 會數）
+    doc = json.loads((out / "transcript.json").read_text(encoding="utf-8"))
+    (out / "frames").mkdir(exist_ok=True)
+    doc["keyframes"] = []
+    for i in range(int(os.environ["FAKE_KEYFRAMES"])):
+        (out / "frames" / f"frame_{i + 1:04d}.jpg").write_bytes(b"\xff\xd8fake")
+        doc["keyframes"].append({"time": float(i * 30), "file": f"frames/frame_{i + 1:04d}.jpg"})
     (out / "transcript.json").write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
 a = sys.argv[1:]
 ctype = a[a.index("--type") + 1] if "--type" in a else None
@@ -92,6 +111,14 @@ out = Path(sys.argv[1])
 a = sys.argv[1:]
 prov = a[a.index("--correct-provider" if KIND == "correction" else "--minutes-provider") + 1]
 model = a[a.index("--correct-model" if KIND == "correction" else "--minutes-model") + 1]
+if "--context" in a:                                    # 〔2.2.0〕同真的程式：寫 context.md（refs.write_context）
+    import refs
+    refs.write_context(out, a[a.index("--context") + 1])
+if KIND == "correction" and os.environ.get("FAKE_REFERENCE"):
+    (out / "reference.json").write_text(json.dumps({"version": "2.2.0", "sources": {"docs": [
+        {"file": "a.pdf", "status": "ok", "chars": 10}, {"file": "b.pdf", "status": "skipped", "reason": "encrypted"},
+        {"file": "c.pdf", "status": "skipped", "reason": "no_text_layer"},
+        {"file": "d.xlsx", "status": "skipped", "reason": "unsupported"}]}}, ensure_ascii=False), encoding="utf-8")
 rl = runlog.RunLog(out, step=KIND)
 t0 = runlog.now()
 rl.call({"provider": prov, "channel": "cli", "model": model, "effort": "low", "auth": "chatgpt" if prov == "openai" else "subscription"},
@@ -154,8 +181,8 @@ def make_runtime(work: Path) -> Path:
     (mmh / "venv" / "bin").mkdir(exist_ok=True)
     (mmh / "venv" / "bin" / "python").write_text('#!/bin/bash\nexec "$(dirname "$0")/../Scripts/python.exe" "$@"\n',
                                                  encoding="utf-8", newline="\n")
-    for n in ("runlog.py", "common.py", "pricing.json", "templates.py", "content_types.py", "diarize.py"):
-        if (RUNTIME / "scripts" / n).exists():          # 〔2.0.0〕範本選單與退回原因用到後三個（1.x 沒有）
+    for n in ("runlog.py", "common.py", "pricing.json", "templates.py", "content_types.py", "diarize.py", "refs.py"):
+        if (RUNTIME / "scripts" / n).exists():          # 〔2.0.0〕範本選單與退回原因用到後三個（1.x 沒有）；〔2.2.0〕refs.py
             shutil.copy(RUNTIME / "scripts" / n, mmh / "scripts" / n)
     (mmh / "scripts" / "transcribe.py").write_text(FAKE_TRANSCRIBE, encoding="utf-8")
     (mmh / "scripts" / "auto_correct.py").write_text(FAKE_STEP % "correction", encoding="utf-8")
@@ -241,7 +268,79 @@ def scenarios():
         out.update(v201_scenarios())
     if V21:
         out.update(v21_scenarios())
+    if V22:
+        out.update(v22_scenarios())
     return out
+
+
+def v22_scenarios():
+    """〔2.2.0〕背景說明一行與送出內容（規格 2.2.0 §7.1、§7.2、§11.5）。這些情境媒體旁沒有說明檔（no_ctx_file），
+    答案順序：類型、人數、專有名詞、①、（背景說明）、①選模型、②、（背景說明）、②選模型、按 Enter 關閉。"""
+    def calls(*kinds):
+        return ("calls", list(kinds))
+    ask = "示範週會，主持人陳怡君"
+    o = {"no_ctx_file": True}
+    special = '含 "引號" $HOME 與 `反引號` 100% & | > ; 結尾\\'
+    return {
+        "ctx_ask": (["claude", "codex"], 0, {}, None, ["", "", "", "", ask, "", "", "", ""],
+                    [calls("transcribe", "correction", "minutes"), ("carg", "correction", "--context", ask, 0),
+                     ("carg_not", "minutes", "--context"), ("wait", "ask_context"), ("ctxmd", ask),
+                     ("notext", "背景說明：沿用"), ("arg", "correction", "openai", "gpt-6.1-sol"),
+                     ("arg", "minutes", "openai", "gpt-6.1-sol"), ("rows_has", "context.md")], o),
+        "ctx_special_chars": (["claude", "codex"], 0, {}, None, ["", "", "", "", special, "", "n", ""],
+                              [calls("transcribe", "correction"), ("carg", "correction", "--context", special, 0)], o),
+        "ctx_file": (["claude", "codex"], 0, {}, None, ["", "", "", "", "", "", "", ""],
+                     [calls("transcribe", "correction", "minutes"), ("text", "背景說明：沿用 meet.context.md"),
+                      ("count", "背景說明：沿用", 1), ("carg_not", "correction", "--context"), ("carg_not", "minutes", "--context"),
+                      ("nowait", "ask_context"), ("arg", "minutes", "openai", "gpt-6.1-sol")]),
+        "ctx_minutes_only": (["claude", "codex"], 0, {}, None, ["", "", "", "n", "", "只整理摘要", "", ""],
+                             [calls("transcribe", "minutes"), ("carg", "minutes", "--context", "只整理摘要", 0),
+                              ("wait", "ask_context"), ("arg", "minutes", "openai", "gpt-6.1-sol")], o),
+        "ctx_both_no": (["claude", "codex"], 0, {}, None, ["", "", "", "n", "n", ""],
+                        [calls("transcribe"), ("nowait", "ask_context"), ("notext", "背景說明")], o),
+        "ctx_skip_enter": (["claude", "codex"], 0, {}, None, ["", "", "", "", "", "", "", "", ""],
+                           [calls("transcribe", "correction", "minutes"), ("carg_not", "correction", "--context"),
+                            ("carg_not", "minutes", "--context"), ("wait", "ask_context"), ("noctxmd",),
+                            ("arg", "minutes", "openai", "gpt-6.1-sol")], o),
+        # 重跑：第一次寫了 context.md，第二次「沿用 context.md」、不問、不傳 --context
+        "ctx_rerun": (["claude", "codex"], 0, {}, None, ["", "", "", "", ask, "", "", "", ""],
+                      [calls("transcribe", "correction", "minutes", "transcribe", "correction", "minutes"),
+                       ("carg", "correction", "--context", ask, 0), ("carg_not_at", "correction", "--context", 1),
+                       ("carg_not_at", "minutes", "--context", 1), ("text", "背景說明：沿用 context.md"), ("ctxmd", ask)],
+                      dict(o, runs=[["", "", "", "", "", "", "", ""]])),
+        "ctx_ask_off": (["claude", "codex"], 0, {"reference": {"ask_context": False}}, None, ["", "", "", "", "", "", "", ""],
+                        [calls("transcribe", "correction", "minutes"), ("carg_not", "correction", "--context"),
+                         ("nowait", "ask_context"), ("notext", "背景說明"), ("arg", "minutes", "openai", "gpt-6.1-sol")], o),
+        # 一次兩個檔：每個檔各問一次
+        "ctx_two_files": (["claude", "codex"], 0, {}, None,
+                          ["", "", "", "", "第一場", "", "n", "", "第二場", "", "n", ""],
+                          [calls("transcribe", "correction", "transcribe", "correction"),
+                           ("carg", "correction", "--context", "第一場", 0), ("carg", "correction", "--context", "第二場", 1)],
+                          dict(o, files=2)),
+        # 詢問行：截圖 3 張、會議文件 2 份（校正）；摘要不列截圖
+        "refs_send_line": (["claude", "codex"], 0, {}, None, ["", "", "", "", "", "", "", "", ""],
+                           [calls("transcribe", "correction", "minutes"),
+                            ("text", "AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）："),
+                            ("text", "（截圖整理另約 15～30 秒）；逐字稿文字、截圖 3 張、會議文件 2 份的名詞與段落會送到 OpenAI"),
+                            ("text", "AI 校正：OpenAI gpt-6.1-sol；逐字稿文字、截圖 3 張、會議文件 2 份的名詞與段落會送到 OpenAI"),
+                            ("text", "會議摘要：OpenAI gpt-6.1-sol；逐字稿文字、會議文件 2 份的名詞與段落會送到 OpenAI"),
+                            ("count", "截圖 3 張", 2), ("notext", "；逐字稿文字會送到")],
+                           dict(o, env={"FAKE_KEYFRAMES": "3"},
+                                media={"meet.議程.md": "# 議程\n", "meet_簡報.pdf": "%PDF-1.4\n", "購物清單.txt": "x"})),
+        # 沒有參考資料：詢問行與 2.1.0 相同
+        "refs_none_line": (["claude", "codex"], 0, {}, None, ["", "", "", "", "", "", "", "", ""],
+                           [calls("transcribe", "correction", "minutes"), ("text", "；逐字稿文字會送到 OpenAI"),
+                            ("notext", "截圖整理"), ("notext", "會議文件")], o),
+        # 結束畫面：reference.json、context.md 兩列（依序）、讀不到的文件、下一步說截圖已參考
+        "refs_end_screen": (["claude", "codex"], 0, {}, None, ["", "", "", "", ask, "", "n", ""],
+                            [calls("transcribe", "correction"),
+                             ("rows", ["transcript.corrected.md", "reference.json", "context.md", "transcript.md", "transcript.srt",
+                                       "transcript.cues.srt", "transcript.corrected.srt"]),
+                             ("text", "會議文件 2 份沒有讀到（加密 1、沒有文字層 1），詳見 reference.json"),
+                             ("text", "影片截圖已在 AI 校正時參考，認出的與會者在 reference.json"),
+                             ("notext", "影片可一併附上 frames 內的截圖")],
+                            dict(o, env={"FAKE_REFERENCE": "1"})),
+    }
 
 
 # 〔2.1.0〕結束畫面的檔案列（依序）：會議、全部按 Enter（校正＋整理）；2.1.0 起多 meeting-minutes.html 一列
@@ -442,13 +541,21 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
     home = work / "home"
     if home.exists():
         shutil.rmtree(home)
+    if (work / "media").exists():                         # 〔2.2.0〕媒體旁的說明檔、文件不得留到下一個情境
+        shutil.rmtree(work / "media")
     for d in ("home/AppData/Roaming", "home/AppData/Local", "media"):
         (work / d).mkdir(parents=True, exist_ok=True)
     audio = work / "media" / "meet.wav"
     audio.write_bytes(b"RIFF")
+    audios = [audio]
+    for i in range(2, int(opts.get("files") or 1) + 1):
+        audios.append(work / "media" / f"meet{i}.wav")
+        audios[-1].write_bytes(b"RIFF")
+    if V22 and not opts.get("no_ctx_file"):              # 〔2.2.0〕舊情境：媒體旁有說明檔 → 入口不多問背景說明
+        (work / "media" / "meet.context.md").write_text("合成素材的背景說明\n", encoding="utf-8")
+    for n, t in (opts.get("media") or {}).items():
+        (work / "media" / n).write_text(t, encoding="utf-8")
     out_dir = work / "media" / "meet_minutes"
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
     sysroot = os.environ.get("SystemRoot", r"C:\Windows")
     bin_ = work / "bin"
     for n in ("claude", "codex"):
@@ -473,17 +580,22 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
         env["FAKE_FAIL_CORRECTION"] = "auth_failed"
     env.update(opts.get("env") or {})
     if shell == "pwsh":
-        cmd = [shutil.which("pwsh"), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1"), str(audio)]
+        cmd = [shutil.which("pwsh"), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1")] + \
+            [str(x) for x in audios]
     elif shell == "powershell":
         cmd = [str(Path(sysroot) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"), "-NoProfile",
-               "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1"), str(audio)]
+               "-ExecutionPolicy", "Bypass", "-File", str(mmh / "mm-sendto.ps1")] + [str(x) for x in audios]
     else:
-        cmd = [str(GIT_BASH), (mmh / "mm-dropped.sh").as_posix(), audio.as_posix()]
+        cmd = [str(GIT_BASH), (mmh / "mm-dropped.sh").as_posix()] + [x.as_posix() for x in audios]
     # bytes：text 模式在 Windows 會把 \n 寫成 \r\n，bash 的 read 會讀到 \r
     text, codes = "", []
     outs, errs = "", ""
     for ans in [answers] + list(opts.get("runs") or []):  # 〔2.0.0〕runs：同一個 runtime 再跑（記住上次）
-        p = subprocess.run(cmd, input=("\n".join(ans) + "\n").encode("utf-8"), capture_output=True, env=env, timeout=180)
+        # 〔2.2.0〕PowerShell 讀導向的 stdin 用主控台字碼頁（繁中 Windows 是 cp950）解碼，答案要用同一個字碼頁送；
+        # 真的主控台輸入走 Unicode，不受影響。bash 照舊送 UTF-8
+        enc = "utf-8" if shell == "bash" or os.name != "nt" else \
+            f"cp{ctypes.windll.kernel32.GetConsoleCP() or ctypes.windll.kernel32.GetOEMCP()}"
+        p = subprocess.run(cmd, input=("\n".join(ans) + "\n").encode(enc), capture_output=True, env=env, timeout=180)
         o, e = p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace")
         text += o + e
         outs += o
@@ -566,6 +678,35 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
         elif c[0] == "notext":
             if c[1] in text:
                 fails.append(f"不該出現「{c[1]}」")
+        elif c[0] in ("carg", "carg_not", "carg_not_at"):    # 〔2.2.0〕correction／minutes 的 argv：第 i 次呼叫有／沒有某旗標
+            xs = [x["argv"] for x in calls_ if x["script"] == c[1]]
+            if c[0] == "carg":
+                argv = xs[c[4]] if len(xs) > c[4] else []
+                if (c[2], c[3]) not in list(zip(argv, argv[1:])):
+                    fails.append(f"{c[1]} 第 {c[4] + 1} 次 argv 沒有 {c[2]} {c[3]!r}：{argv}")
+            elif c[0] == "carg_not_at":
+                argv = xs[c[3]] if len(xs) > c[3] else None
+                if argv is None or c[2] in argv:
+                    fails.append(f"{c[1]} 第 {c[3] + 1} 次 argv 不該有 {c[2]}：{argv}")
+            elif any(c[2] in argv for argv in xs):
+                fails.append(f"{c[1]} argv 不該有 {c[2]}：{xs}")
+        elif c[0] == "nowait":
+            rl = out_dir / "run_log.jsonl"
+            evs = [json.loads(line) for line in rl.read_text(encoding="utf-8").splitlines()] if rl.exists() else []
+            if any(e.get("event") == "wait" and e.get("name") == c[1] for e in evs):
+                fails.append(f"run_log 不該有 wait {c[1]}")
+        elif c[0] in ("ctxmd", "noctxmd"):
+            cm = out_dir / "context.md"
+            if c[0] == "noctxmd":
+                if cm.exists():
+                    fails.append("不該寫 context.md")
+            elif not cm.exists() or not cm.read_text(encoding="utf-8").endswith("\n" + c[1] + "\n") or \
+                    "source: entry" not in cm.read_text(encoding="utf-8"):
+                fails.append(f"context.md 不對：{cm.read_text(encoding='utf-8') if cm.exists() else '（沒有）'}")
+        elif c[0] == "rows_has":
+            got = [ln[2:].split()[0] for ln in outs.splitlines() if ln.startswith("  ") and ln[2:3] != " " and ln[2:].split()]
+            if c[1] not in got:
+                fails.append(f"結束畫面沒有 {c[1]} 這一列")
         elif c[0] == "runs":
             rf = mmh / "logs" / "runs.jsonl"
             rows = [json.loads(line) for line in rf.read_text(encoding="utf-8").splitlines()] if rf.exists() else []
@@ -574,11 +715,159 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
             elif not rows[0].get("wait_sec") and "ask_speakers" not in (out_dir / "run_log.jsonl").read_text(encoding="utf-8"):
                 fails.append("run_log 沒有等待時間")
     run_ids = {x.get("run_id") for x in calls_}
-    if calls_ and len(run_ids) != 1 + len(opts.get("runs") or []):
+    if calls_ and len(run_ids) != len(audios) * (1 + len(opts.get("runs") or [])):
         fails.append(f"同一個檔案的 run_id 不一致：{run_ids}")
     if any(codes):
         fails.append(f"exit {codes}")
     return fails, text
+
+
+# ---------------------------------------------------------------- 〔2.2.0〕貼上兩行（真主控台／pty；規格 2.2.0 §7.1 鍵盤緩衝）
+PS_PASTE = r"""
+param([string]$Src, [string]$Out, [string]$Mode)
+$r = [ordered]@{ mode = $Mode }
+try {
+    $code = Get-Content -LiteralPath $Src -Raw -Encoding UTF8
+    foreach ($name in @("Clear-KeyBuffer", "Get-Opt", "Now-Iso", "Ask", "Ask-Context")) {
+        $m = [regex]::Match($code, "(?ms)^function $([regex]::Escape($name))[ (\{].*?^\}")
+        if (-not $m.Success) { throw "找不到函式 $name" }
+        $body = $m.Value
+        if ($name -eq "Clear-KeyBuffer") { $body = $body -replace "^function Clear-KeyBuffer", "function Real-ClearKeyBuffer" }
+        if ($name -eq "Ask-Context" -and $Mode -eq "noflush") {      # 對照組：Ask-Context 讀完後不清緩衝
+            $body = $body -replace "(?m)^[ \t]*Clear-KeyBuffer[ \t].*$", ""
+        }
+        Invoke-Expression $body
+    }
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class MmpPaste {
+    [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
+    public struct KEY_EVENT_RECORD {
+        [FieldOffset(0)] public int bKeyDown; [FieldOffset(4)] public ushort wRepeatCount;
+        [FieldOffset(6)] public ushort wVirtualKeyCode; [FieldOffset(8)] public ushort wVirtualScanCode;
+        [FieldOffset(10)] public char UnicodeChar; [FieldOffset(12)] public uint dwControlKeyState;
+    }
+    [StructLayout(LayoutKind.Explicit)]
+    public struct INPUT_RECORD { [FieldOffset(0)] public ushort EventType; [FieldOffset(4)] public KEY_EVENT_RECORD KeyEvent; }
+    [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr GetStdHandle(int n);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool WriteConsoleInputW(IntPtr h, INPUT_RECORD[] r, uint n, out uint w);
+    public static uint Type(string s) {
+        var r = new INPUT_RECORD[s.Length * 2];
+        for (int i = 0; i < s.Length; i++) {
+            ushort vk = (ushort)(s[i] == '\r' ? 13 : 0);
+            for (int k = 0; k < 2; k++) {
+                r[i * 2 + k].EventType = 1; r[i * 2 + k].KeyEvent.bKeyDown = (k == 0) ? 1 : 0;
+                r[i * 2 + k].KeyEvent.wRepeatCount = 1; r[i * 2 + k].KeyEvent.wVirtualKeyCode = vk;
+                r[i * 2 + k].KeyEvent.UnicodeChar = s[i];
+            }
+        }
+        uint w; WriteConsoleInputW(GetStdHandle(-10), r, (uint)r.Length, out w); return w;
+    }
+}
+"@
+    # 題目出現時（Ask 開頭清緩衝之後）使用者貼上兩行
+    $script:clears = 0
+    function Clear-KeyBuffer { Real-ClearKeyBuffer; $script:clears++; if ($script:clears -eq 1) { [void][MmpPaste]::Type("line one`rline two`r") } }
+    function Log-Wait { }
+    $cfg = $null; $Vendor = @{ claude = "Anthropic"; openai = "OpenAI" }
+    $script:RefsPlan = $null; $script:CtxAsked = $false; $script:CtxLine = $null
+    $r.redirected = [Console]::IsInputRedirected
+    Ask-Context "x" "claude"
+    $r.context = $script:CtxLine
+    $r.left = [Console]::KeyAvailable                 # 第二行還在緩衝區嗎
+    [void][MmpPaste]::Type("3`r")                     # 下一題（選模型）才輸入的答案
+    $r.next = Read-Host "next"
+} catch { $r.error = "$_" }
+$r | ConvertTo-Json | Set-Content -LiteralPath $Out -Encoding UTF8
+"""
+
+PTY_PASTE = r"""
+import json, os, pty, select, sys, time, re
+SRC = %r
+MODE = %r
+def func(name):
+    m = re.search(r"(?ms)^" + re.escape(name) + r"\(\) \{.*?^\}", SRC)
+    return m.group(0)
+body = "now_iso() { date; }\n" + "\n".join(func(n) for n in ("flush_input", "ask", "ask_context"))
+if MODE == "noflush":
+    body = body.replace("    flush_input   # 讀完再清一次", "    :   # 對照組")
+script = ('ASK_ANS=""; ASK_T0=""; ASK_T1=""; CTX_ASKED=""; CTX_LINE=""; REFS_CTX=""\n'
+          'cfg_get() { echo ""; }\nvendor() { echo Anthropic; }\nlog_wait() { return 0; }\n' + body +
+          '\nask_context x claude\nprintf "\\nCTX[%%s]\\n" "$CTX_LINE"\nIFS= read -r -p "next> " nxt\nprintf "\\nNEXT[%%s]\\n" "$nxt"\n')
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp("bash", ["bash", "--norc", "--noprofile", "-c", script])
+out = b""
+def pump(until, t=10):
+    global out
+    end = time.time() + t
+    while until not in out and time.time() < end:
+        r, _, _ = select.select([fd], [], [], 0.2)
+        if r:
+            try:
+                out += os.read(fd, 4096)
+            except OSError:
+                return
+pump("背景說明".encode("utf-8"))
+time.sleep(0.3)
+os.write(fd, b"line one\rline two\r")      # 貼上兩行
+pump(b"next> ")
+time.sleep(0.5)
+os.write(fd, b"3\r")
+pump(b"NEXT[")
+pump(b"]\r\n", 3)
+os.waitpid(pid, 0)
+print(json.dumps(out.decode("utf-8", "replace")))
+"""
+
+
+def paste_check(shell: str, work: Path) -> tuple:
+    """回傳 (fails, text)；fails 是 None＝略過。PowerShell：隱藏的新主控台（不導向 stdin）；bash：WSL 的 pty。"""
+    sendto, dropped = RUNTIME / "mm-sendto.ps1", RUNTIME / "mm-dropped.sh"
+    results, fails = {}, []
+    if shell in ("pwsh", "powershell"):
+        exe = shutil.which("pwsh") if shell == "pwsh" else str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" /
+                                                              "WindowsPowerShell" / "v1.0" / "powershell.exe")
+        if not exe or os.name != "nt":
+            return None, "沒有這個 PowerShell"
+        (work / "paste.ps1").write_text(PS_PASTE, encoding="utf-8-sig")
+        for mode in ("flush", "noflush"):
+            res = work / f"paste-{shell}-{mode}.json"
+            res.unlink(missing_ok=True)
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            p = subprocess.Popen([exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(work / "paste.ps1"), str(sendto),
+                                  str(res), mode], creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=si)
+            p.wait(timeout=120)
+            results[mode] = json.loads(res.read_text(encoding="utf-8-sig"))
+        f, c = results["flush"], results["noflush"]
+        if f.get("error") or c.get("error"):
+            fails.append(f"錯誤：{f.get('error') or c.get('error')}")
+        else:
+            if f["redirected"]:
+                fails.append("stdin 被導向（不是真主控台）")
+            if (f["context"], f["left"], f["next"]) != ("line one", False, "3"):
+                fails.append(f"清緩衝：背景說明 {f['context']!r}、第二行留在緩衝 {f['left']}、下一題讀到 {f['next']!r}")
+            if (c["context"], c["left"], c["next"]) != ("line one", True, "line two"):
+                fails.append(f"對照組（不清）應該讀到第二行：{c}")
+        return fails, json.dumps(results, ensure_ascii=False)
+    if os.environ.get("MMP_TEST_NO_WSL") or os.name != "nt" or not shutil.which("wsl.exe"):
+        return None, "沒有 WSL（或 MMP_TEST_NO_WSL）：pty 實測略過"
+    src = dropped.read_text(encoding="utf-8")
+    for mode in ("flush", "noflush"):
+        p = subprocess.run(["wsl.exe", "-e", "python3", "-"], input=(PTY_PASTE % (src, mode)).encode("utf-8"),
+                           capture_output=True, timeout=120)
+        if p.returncode != 0:
+            return [f"pty 執行失敗：{p.stderr.decode('utf-8', 'replace')[:200]}"], ""
+        results[mode] = json.loads(p.stdout.decode("utf-8").strip().splitlines()[-1])
+    if "CTX[line one]" not in results["flush"] or "NEXT[3]" not in results["flush"]:
+        fails.append("清緩衝：" + results["flush"][-200:])
+    if "NEXT[line two]" not in results["noflush"]:
+        fails.append("對照組（不清）應該讀到第二行：" + results["noflush"][-200:])
+    return fails, json.dumps(results, ensure_ascii=False)
 
 
 def main():
@@ -604,6 +893,16 @@ def main():
                 bad += 1
             if args.show or fails:
                 (work / f"{shell}-{name}.log").write_text(text, encoding="utf-8")
+        if V22 and (not args.only or "paste_two_lines" in args.only):     # 〔2.2.0〕貼上兩行（真主控台／pty）
+            fails, text = paste_check(shell, work)
+            if fails is None:
+                print(f"[SKIP] {shell:10s} paste_two_lines：{text}")
+                continue
+            total += 1
+            print(f"[{'PASS' if not fails else 'FAIL'}] {shell:10s} paste_two_lines" + ("" if not fails else "：" + "；".join(fails)))
+            if fails:
+                bad += 1
+                (work / f"{shell}-paste_two_lines.log").write_text(text, encoding="utf-8")
     print(f"\n{total - bad}/{total} 通過")
     sys.exit(1 if bad else 0)
 

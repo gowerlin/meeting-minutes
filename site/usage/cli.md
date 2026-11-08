@@ -22,7 +22,7 @@ macOS 的路徑寫法例如 `~/Documents/會議/0912.m4a`。
 Claude 會依序：
 
 1. 在你的電腦上轉寫（技術會議會建議改用 Breeze）。
-2. 讀逐字稿與影片截圖，把 S1、S2 對應到與會者姓名。
+2. 讀逐字稿與影片截圖（有 `reference.json` 時用它的整理結果），把 S1、S2 對應到與會者姓名。
 3. 校正字詞，產出 `transcript.corrected.md` 與 `meeting-minutes.md`。
 4. 列出建議加進[對照表](/features/accuracy#固定錯誤對照表)的項目，請你確認後才寫入。
 

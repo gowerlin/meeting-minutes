@@ -232,6 +232,10 @@ class AutoCorrectLog(Base):
 
     def setUp(self):
         super().setUp()
+        # 〔2.2.0〕輸出資料夾放在自己的上層資料夾裡（refs.py 會看「媒體旁」＝上一層，不要看到系統暫存區）
+        self._root = self.out
+        self.out = self._root / "demo_minutes"
+        self.out.mkdir()
         self._callers = dict(ac.CALLERS)
         self._select = ac.select_backend
         os.environ["OPENAI_API_KEY"] = "sk-test-SECRET-should-not-appear"
@@ -242,6 +246,7 @@ class AutoCorrectLog(Base):
         ac.select_backend = self._select
         os.environ.pop("OPENAI_API_KEY", None)
         super().tearDown()
+        shutil.rmtree(self._root, ignore_errors=True)
 
     def test_chunks_terms_calls(self):
         texts = ["示範證券下單系統的權限設計要重新檢查一次。" * 3, "Kafka 的 consumer lag 高峰兩萬筆左右。" * 3,
@@ -413,6 +418,88 @@ class HtmlLog(Base):
         r = render_html.render(d, md_name="missing.md", cfg={}, run_log=rl)
         cp = [e for e in runlog.read_events(d / runlog.LOG_NAME) if e["event"] == "checkpoint"][-1]
         self.assertEqual((cp["status"], cp["reason"]), ("skipped", "no_md"))
+
+
+@unittest.skipUnless(_testenv.VER >= (2, 2, 0), "2.2.0 才有")
+class RefsLog(Base):
+    """〔2.2.0〕規格 2.2.0 §8.4、§11.4：correct.refs 檢查點只有數量與原因代碼；call 事件的 images；
+    run_log／runs.jsonl 不含說明檔、文件內容與檔名的片段；階段名「參考資料」、summary 不加欄位。"""
+
+    def setUp(self):
+        super().setUp()
+        self._root = self.out
+        self.out = self._root / "demo_minutes"
+        self.out.mkdir()
+        self._callers = dict(ac.CALLERS)
+        self._select = ac.select_backend
+
+    def tearDown(self):
+        ac.CALLERS.clear()
+        ac.CALLERS.update(self._callers)
+        ac.select_backend = self._select
+        super().tearDown()
+        shutil.rmtree(self._root, ignore_errors=True)
+
+    CONTEXT = "研發部第三季庫存盤點會議，主持人是物流組長"
+    DOC = "倉儲系統的批次揀貨流程要在月底前完成驗收"
+    DOC_NAME = "demo.倉儲改善計畫.md"
+
+    def test_checkpoint_fields_and_no_content(self):
+        write_out(self.out, [("00:00:00", "S1", "今天確認倉儲系統的批次揀貨流程。" * 3),
+                             ("00:01:00", "S2", "月底前完成驗收沒問題。" * 3)])
+        (self._root / "demo.context.md").write_text(self.CONTEXT + "\n常用寫法：WMS、RFID", encoding="utf-8")
+        (self._root / self.DOC_NAME).write_text(f"# Pick-to-Light 導入\n\n{self.DOC}\n", encoding="utf-8")
+        ac.CALLERS[("claude", "cli")] = FakeModel()
+        ac.select_backend = lambda cfg, req: {"provider": "claude", "channel": "cli", "exe": "x", "cli_version": "f",
+                                              "auth": "subscription", "note": None, "model": "opus", "effort": "medium",
+                                              "model_api": "opus"}
+        res = ac.run(self.out, {"provider": "claude", "channel": "cli", "model": None, "effort": None}, cfg={}, consent=True)
+        self.assertEqual(res["status"], "ok")
+        ev = self.events()
+        cp = [e for e in ev if e["event"] == "checkpoint" and e["name"] == "correct.refs"]
+        self.assertEqual(len(cp), 1)
+        self.assertEqual((cp[0]["status"], cp[0]["reason"], cp[0]["docs_read"], cp[0]["participants"]),
+                         ("skipped", "no_keyframes", 1, 0))
+        self.assertEqual(cp[0]["context_chars"], len(self.CONTEXT) + len("\n常用寫法：WMS、RFID"))
+        allowed = {"ts", "run_id", "event", "version", "step", "name", "started_at", "ended_at", "duration_sec", "status",
+                   "reason", "frames_available", "frames_sent", "frames_dropped", "frame_px", "docs_read", "docs_skipped",
+                   "doc_chars", "terms", "terms_chars", "paragraphs", "paragraphs_chars", "context_chars", "participants",
+                   "speakers_mapped", "images_fallback", "duration_ms"}
+        self.assertLessEqual(set(cp[0]), allowed)
+        self.assertTrue(all(isinstance(v, (int, float, dict)) or v is None or k in ("ts", "run_id", "event", "version", "step",
+                                                                                        "name", "started_at", "ended_at",
+                                                                                        "status", "reason")
+                            for k, v in cp[0].items()))
+        blob = (self.out / runlog.LOG_NAME).read_text(encoding="utf-8") + json.dumps(self.runs(), ensure_ascii=False)
+        for t in (self.CONTEXT, self.DOC):
+            for i in range(0, len(t) - 6):
+                self.assertNotIn(t[i:i + 6], blob, "log 含參考資料內容片段")
+        for s in (self.DOC_NAME, "倉儲改善計畫", "Pick-to-Light", "demo.context.md", "RFID"):
+            self.assertNotIn(s, blob)
+        rows = runlog.summary_rows(self.runs())
+        self.assertEqual(list(rows[-1]), list(runlog.summary_rows([{"stages": {}}])[0]))      # 不加欄位
+        self.assertEqual(set(self.runs()[-1]["stages"]), {"correct", "subtitles"})          # correct.refs 不另成階段
+        self.assertEqual(runlog.STAGE_NAME["correct.refs"], "參考資料")
+
+    def test_call_event_images(self):
+        rl = runlog.RunLog(self.out, step="correct")
+        imgs = [self.out / "a.jpg", self.out / "b.jpg"]
+        for p in imgs:
+            p.write_bytes(b"\xff\xd8")
+        ac.CALLERS[("claude", "cli")] = lambda be, s, u, t, schema=None, images=None: ac._ok("x", None, {"input": 2400}, "m")
+        be = {"provider": "claude", "channel": "cli", "model": "opus", "effort": "medium", "model_api": "opus"}
+        old = ac.CALL_LOG
+        ac.CALL_LOG = rl
+        try:
+            with ac.call_context(stage="correct.refs"):
+                ac.call(be, "s", "u", 5, ac.REFS_SCHEMA, images=imgs)
+            ac.call(be, "s", "u", 5)
+        finally:
+            ac.CALL_LOG = old
+        calls = [e for e in self.events() if e["event"] == "call"]
+        self.assertEqual((calls[0]["images"], calls[0]["stage"], calls[0]["tokens"]["input"]), (2, "correct.refs", 2400))
+        self.assertNotIn("images", calls[1])
+        self.assertNotIn("a.jpg", (self.out / runlog.LOG_NAME).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

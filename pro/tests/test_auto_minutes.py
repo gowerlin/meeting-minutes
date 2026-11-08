@@ -61,7 +61,10 @@ class Base(unittest.TestCase):
         self._home = os.environ["MEETING_MINUTES_PRO_HOME"]
         self.home = Path(tempfile.mkdtemp(prefix="mmp-am-home-"))
         os.environ["MEETING_MINUTES_PRO_HOME"] = str(self.home)
-        self.out = Path(tempfile.mkdtemp(prefix="mmp-am-out-"))
+        # 〔2.2.0〕輸出資料夾放在自己的上層資料夾裡（refs.py 會看「媒體旁」＝輸出資料夾的上一層，不要看到系統暫存區）
+        self.parent = Path(tempfile.mkdtemp(prefix="mmp-am-out-"))
+        self.out = self.parent / "demo_minutes"
+        self.out.mkdir()
         self._callers = dict(ac.CALLERS)
         self._select = am.select_backend
         self._wait = ac.RETRY_WAIT
@@ -75,7 +78,7 @@ class Base(unittest.TestCase):
         ac.RETRY_WAIT = self._wait
         os.environ["MEETING_MINUTES_PRO_HOME"] = self._home
         shutil.rmtree(self.home, ignore_errors=True)
-        shutil.rmtree(self.out, ignore_errors=True)
+        shutil.rmtree(self.parent, ignore_errors=True)
 
     def use(self, fake, provider="claude", model="opus", effort="medium"):
         ac.CALLERS[(provider, "cli")] = fake
@@ -1131,6 +1134,372 @@ class Html(Base):
         self.run_am(force=True)
         b = (self.out / "meeting-minutes.md").read_bytes()
         self.assertEqual(re.sub(rb"\d{4}-\d\d-\d\d", b"D", a), re.sub(rb"\d{4}-\d\d-\d\d", b"D", b))
+
+
+
+# ================================================================ 〔2.2.0〕參考資料（規格 2.2.0 §6.4、§7.3、§8.4、§9.1、§11.6）
+V22 = _testenv.VER >= (2, 2, 0)
+REF_DOC = "今天確認壓測的高峰每秒八百筆委託延遲一百二十毫秒以內"
+
+
+def write_reference(out: Path, **over):
+    ref = {"version": "2.2.0", "created_at": "2026-11-08T09:00:00+08:00",
+           "by": {"provider": "claude", "model": "opus", "effort": "medium", "channel": "cli", "stage": "correct.refs"},
+           "sources": {"context": [], "docs": [], "frames": {"available": 3, "sent": 3, "dropped": {}, "max_px": 1280}},
+           "meeting": {"title": "示範證券 下單系統 v3 上線準備會議", "date": "2026-11-03（二）", "time": "14:00–14:30"},
+           "participants": [{"name": "陳怡君", "role": "主持人、專案經理", "speaker": "S1", "source": "frame"},
+                            {"name": "林家豪", "role": "SRE", "speaker": "S2", "source": "frame"},
+                            {"name": "張雅婷", "role": "後端", "speaker": None, "source": "frame"}],
+           "speakers": {"S1": {"name": "陳怡君", "evidence": "截圖 00:00:01 正在發言"},
+                        "S2": {"name": "林家豪", "evidence": "截圖 00:00:25 正在發言"}},
+           "terms": ["示範證券", "Redis Sentinel"], "doc_terms": [], "doc_paragraphs": [], "frames": []}
+    ref.update(over)
+    (out / "reference.json").write_text(json.dumps(ref, ensure_ascii=False), encoding="utf-8")
+    return ref
+
+
+def sec_of(user: str, name: str) -> str:
+    m = re.search(rf"## {name}[^\n]*\n(.*?)(?=\n## |\Z)", user, re.S)
+    return m.group(1).strip() if m else ""
+
+
+def capture(fn, *a, **k):
+    """執行 fn，回傳 (結果, stderr 文字)。"""
+    import contextlib
+    import io
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        r = fn(*a, **k)
+    return r, err.getvalue()
+
+
+@unittest.skipUnless(V22, "2.2.0 才有")
+class RefsUnits(unittest.TestCase):
+    """§6.4.3 的程式補值與 §6.4.2 的提示詞（不呼叫模型）。"""
+
+    def test_ref_datetime(self):
+        f = am.ref_datetime
+        self.assertEqual(f({"meeting": {"date": "2026-11-03（二）", "time": "14:00–14:30"}}), "2026-11-03 14:00–14:30")
+        self.assertEqual(f({"meeting": {"date": "2026/11/3 週二", "time": ""}}), "2026-11-03")
+        self.assertEqual(f({"meeting": {"date": "2026年11月3日（星期二）", "time": "14:00"}}), "2026-11-03 14:00")
+        self.assertEqual(f({"meeting": {"date": "2026-11-03 (Tue)", "time": "06:00 UTC"}}), "2026-11-03 06:00 UTC")
+        self.assertEqual(f({"meeting": {"date": "2026-11-03（二）14:00–14:30", "time": "14:00–14:30"}}),
+                         "2026-11-03 14:00–14:30")                    # 時間已寫在日期裡不重複
+        self.assertEqual(f({"meeting": {"date": "", "time": ""}}), "")
+        self.assertEqual(f(None), "")
+
+    def test_apply_refs(self):
+        rm = {"speakers": {"S1": {"name": "陳怡君"}, "S2": {"name": "林家豪"}, "S3": {"name": "王志明"}},
+              "participants": [{"name": "陳怡君", "role": "主持人、專案經理", "speaker": "S1"},
+                               {"name": "林家豪", "role": "SRE", "speaker": "S2"},
+                               {"name": "王志明", "role": "", "speaker": "S3"},
+                               {"name": "張雅婷", "role": "後端", "speaker": None},
+                               {"name": "Kevin Lee", "role": "", "speaker": None}]}
+        d = {"participants": [{"speaker": "S1", "name": "", "role": ""}, {"speaker": "S2", "name": "家豪", "role": "維運"},
+                              {"speaker": "S3", "name": "李大同", "role": ""}, {"speaker": "S4", "name": "Kevin", "role": ""}]}
+        notes = am.apply_refs(d, rm)
+        self.assertEqual(notes, ["S3：摘要寫 李大同、截圖對應 王志明，採截圖"])
+        p = {x["speaker"] or x["name"]: x for x in d["participants"]}
+        self.assertEqual((p["S1"]["name"], p["S1"]["role"], p["S1"]["name_source"]), ("陳怡君", "主持人、專案經理", "frame"))
+        self.assertEqual((p["S2"]["name"], p["S2"]["role"]), ("林家豪", "維運"))       # 同一人的簡寫補全名、模型的職務保留
+        self.assertEqual(p["S4"]["name"], "Kevin")                                     # 沒有截圖對應的代號不動
+        self.assertEqual(d["participants"][-1], {"speaker": "", "name": "張雅婷", "role": "後端", "name_source": "frame_unmapped"})
+        self.assertNotIn("Kevin Lee", [x["name"] for x in d["participants"]])          # 與模型寫的同一人，不重複列
+        self.assertEqual(am.apply_refs(d, None), [])
+        d2 = {"participants": []}
+        am.apply_refs(d2, {"speakers": {"S2": {"name": "林家豪"}}, "participants": []})
+        self.assertEqual(d2["participants"], [{"speaker": "S2", "name": "林家豪", "role": "", "name_source": "frame"}])
+
+    def test_model_already_named(self):
+        """模型拿到〈與會者〉後自己寫了全名（§11.5 實跑的形狀：沒有代號的人放最前面、代號的姓名與截圖相同）：
+        姓名仍標（截圖），沒有代號的人照「未對應代號」列在最後；不產生矛盾說明。"""
+        rm = {"speakers": {"S1": {"name": "陳怡君"}, "S2": {"name": "林家豪"}, "S3": {"name": "王志明"}},
+              "participants": [{"name": "陳怡君", "role": "專案經理", "speaker": "S1"}, {"name": "林家豪", "role": "SRE", "speaker": "S2"},
+                               {"name": "張雅婷", "role": "後端", "speaker": None}, {"name": "王志明", "role": "資安", "speaker": "S3"}]}
+        d = {"participants": [{"speaker": "", "name": "張雅婷", "role": ""}, {"speaker": "S1", "name": "陳怡君", "role": "專案經理"},
+                              {"speaker": "S2", "name": "林家豪", "role": "SRE"}, {"speaker": "S3", "name": "王志明", "role": ""},
+                              {"speaker": "S?", "name": "", "role": ""}]}
+        self.assertEqual(am.apply_refs(d, rm), [])
+        self.assertEqual([p.get("name_source") for p in d["participants"]], ["frame_unmapped", "frame", "frame", "frame", None])
+        md = am.render_markdown(d, {"duration": 578.0}, Path(tempfile.gettempdir()), "transcript.corrected.md", "x", 1, "single", [],
+                                refx={"date": "2026-11-03 14:00–14:30", "send": "s", "notes": []})
+        self.assertIn("| 與會者 | 陳怡君（截圖）（S1）、林家豪（截圖）（S2）、王志明（截圖）（S3）、S?、張雅婷（截圖，未對應代號）：後端 |", md)
+        self.assertIn("| 日期時間 | 2026-11-03 14:00–14:30（截圖）（長度 00:09:38） |", md)
+
+    def test_cells(self):
+        parts = [{"speaker": "S2", "name": "林家豪", "role": "SRE", "name_source": "frame"},
+                 {"speaker": "S1", "name": "陳怡君", "role": ""},
+                 {"speaker": "", "name": "張雅婷", "role": "後端", "name_source": "frame_unmapped"}]
+        self.assertEqual(am.speakers_cell(parts, {}), "陳怡君（S1）；林家豪（截圖）（S2）：SRE；張雅婷（截圖，未對應代號）：後端")
+        meta = {"speaker_stats": STATS[:2]}
+        self.assertEqual(am.speakers_cell(parts, meta),
+                         "陳怡君（S1） 58:13；林家豪（截圖）（S2）：SRE，1:21；張雅婷（截圖，未對應代號）：後端")
+        self.assertEqual(am.date_cell({"date": "2026-11-03 14:00–14:30"}, 600.0), "2026-11-03 14:00–14:30（截圖）（長度 00:10:00）")
+        self.assertEqual(am.date_cell(None, 600.0), "（待確認）（長度 00:10:00）")
+        self.assertEqual(am.minutes_send_line(None), "只送逐字稿文字")
+        self.assertEqual(am.minutes_send_line({"used": True, "context_text": "x", "docs_read": 2, "participants": [1, 2, 3, 4]}),
+                         "送出逐字稿文字、背景說明、會議文件 2 份的名詞與段落；截圖沒有送給摘要（校正時認出的與會者 4 位已參考）")
+        self.assertEqual(am.minutes_send_line({"used": True, "terms": ["a"]}),
+                         "送出逐字稿文字、校正時整理的參考資料；截圖沒有送給摘要（校正時整理的參考資料已參考）")
+
+    def test_prompts(self):
+        for stage in ("single", "part"):
+            base, refs_, both = (am.meeting_system(stage), am.meeting_system(stage, with_refs=True),
+                                 am.meeting_system(stage, with_template=True, with_refs=True))
+            self.assertNotIn("〔2.2.0〕", base)
+            self.assertIn("\n9. " + am.RULE_REFS_MEETING + "\n10. ", refs_)
+            self.assertIn("\n9. " + am.RULE_REFS_MEETING + "\n10. " + ct.TEMPLATE_RULE_TEXT + "\n11. ", both)
+        self.assertIs(am.meeting_system("single"), am.SYSTEM_MINUTES)
+        self.assertTrue(am.SYSTEM_MERGE_REFS.startswith(am.SYSTEM_MERGE))
+        self.assertTrue(am.SYSTEM_MERGE_REFS.endswith("9. 〔2.2.0〕" + am.MERGE_RULE_REFS + "\n"))
+        for code in ct.CODES:
+            if code == "meeting":
+                continue
+            plain = ct.system_of(code, "single")
+            self.assertIn("\n7. " + ct.RULE_REFS_TEXT + "\n\n", ct.system_of(code, "single", with_refs=True))
+            self.assertIn("\n7. " + ct.TEMPLATE_RULE_TEXT + "\n8. " + ct.RULE_REFS_TEXT,
+                          ct.system_of(code, "part", with_template=True, with_refs=True))
+            self.assertNotIn("〔2.2.0〕", plain)
+            self.assertEqual(ct.merge_system(code, with_refs=True), ct.merge_system(code) + "\n7. 〔2.2.0〕" + ct.MERGE_RULE_REFS_TEXT)
+        self.assertNotIn("會議", ct.RULE_REFS_TEXT.replace("〈會議資訊〉", "").replace("〈會議文件的相關段落〉", ""))
+
+
+@unittest.skipUnless(V22, "2.2.0 才有")
+class RefsRun(Base):
+    """§6.4、§8.4、§9.1：摘要帶參考資料（假呼叫器）。"""
+
+    def materials(self, reference=True, context=True, doc=True):
+        self.write()
+        if reference:
+            write_reference(self.out)
+        if context:
+            (self.parent / "demo.context.md").write_text("示範證券上線準備週會。常用寫法：Grafana、Prometheus\n", encoding="utf-8")
+        if doc:
+            (self.parent / "demo.議程.md").write_text(f"# 上線準備\n\n{REF_DOC}\n", encoding="utf-8")
+
+    def rec(self):
+        return json.loads((self.out / "auto_minutes.json").read_text(encoding="utf-8"))
+
+    def md(self):
+        return (self.out / "meeting-minutes.md").read_text(encoding="utf-8")
+
+    def test_full_single(self):
+        self.materials()
+        fake = Fake([result(participants=[{"speaker": "S1", "name": "", "role": ""},
+                                          {"speaker": "S2", "name": "王志明", "role": ""}])])
+        self.use(fake)
+        res, console = capture(self.run_am)
+        self.assertEqual(res["status"], "ok", res)
+        self.assertIn("逐字稿文字、會議文件 1 份的名詞與段落、背景說明、校正時整理的參考資料（不含截圖）會送到 Anthropic", console)
+        self.assertIn("講者對應：S2：摘要寫 王志明、截圖對應 林家豪，採截圖", console)
+        c = fake.calls[0]
+        self.assertEqual(c["system"], am.meeting_system("single", with_refs=True))
+        u = c["user"]
+        order = ["## 專有名詞", "## 背景說明（使用者提供）", "## 與會者（參考資料：截圖）", "## 會議資訊（參考資料）",
+                 "## 參考資料用字", "## 會議文件的相關段落（本機抽出，只供理解，不是會中說的話）", "## 逐字稿"]
+        self.assertEqual([u.index(x) for x in order], sorted(u.index(x) for x in order))
+        self.assertEqual(sec_of(u, "背景說明"), "示範證券上線準備週會。常用寫法：Grafana、Prometheus")
+        self.assertEqual(sec_of(u, "與會者"), "- 陳怡君（主持人、專案經理）＝S1\n- 林家豪（SRE）＝S2\n- 張雅婷（後端）")
+        self.assertEqual(sec_of(u, "會議資訊（參考資料）"), "- 會議名稱：示範證券 下單系統 v3 上線準備會議\n- 日期：2026-11-03（二）\n- 時間：14:00–14:30")
+        self.assertTrue(sec_of(u, "參考資料用字").startswith("示範證券、Redis Sentinel"))
+        self.assertIn(f"- （demo.議程.md）{REF_DOC}", sec_of(u, "會議文件的相關段落"))
+        md = self.md()
+        self.assertIn("| 日期時間 | 2026-11-03 14:00–14:30（截圖）（長度 00:10:00） |", md)
+        self.assertIn("| 與會者 | 陳怡君（截圖）（S1）、林家豪（截圖）（S2）、張雅婷（截圖，未對應代號）：後端 |", md)
+        self.assertIn("；送出逐字稿文字、背景說明、會議文件 1 份的名詞與段落；截圖沒有送給摘要（校正時認出的與會者 3 位已參考）", md)
+        self.assertIn("- 講者對應：S2：摘要寫 王志明、截圖對應 林家豪，採截圖", md)
+        self.assertIn("標「（截圖）」的姓名依 AI 校正時截圖上「正在發言」的名牌對應", md)
+        self.assertNotIn("沒有送截圖", md)
+        want = {"source": "reference.json", "docs_read": 1, "terms": res["reference"]["terms"], "participants": 3}
+        self.assertEqual(res["reference"], want)
+        self.assertGreaterEqual(want["terms"], 3)
+        self.assertEqual(self.rec()["reference"], want)
+        ev = runlog.read_events(self.out / runlog.LOG_NAME)
+        cp = [e for e in ev if e["event"] == "checkpoint" and e["name"] == "minutes.refs"]
+        self.assertEqual(len(cp), 1)
+        self.assertEqual((cp[0]["step"], cp[0]["status"], cp[0]["source"], cp[0]["docs_read"], cp[0]["participants"],
+                          cp[0]["context_chars"] > 0, cp[0]["paragraphs"] >= 1),
+                         ("minutes", "ok", "reference.json", 1, 3, True, True))
+        names = [e.get("name") for e in ev if e["event"] == "checkpoint"]
+        self.assertLess(names.index("minutes.refs"), names.index("minutes.part"))
+        log = (self.out / runlog.LOG_NAME).read_text(encoding="utf-8") + json.dumps(self.rec(), ensure_ascii=False)
+        for frag in ("陳怡君", "林家豪", "張雅婷", "示範證券", "Grafana", "demo.議程", "context.md", REF_DOC[:6], "上線準備週會"):
+            self.assertNotIn(frag, log, frag)
+        self.assertFalse(any(p.name in ("reference.json", "context.md") for p in self.home.rglob("*")))
+
+    def test_merge_gets_people_only(self):
+        self.materials()
+        fake = Fake([result("1"), result("2"), result("3"), result("合併")])
+        self.use(fake)
+        res, _ = capture(self.run_am, cfg={"minutes": {"chunk_chars": 50}})
+        self.assertEqual(res["status"], "ok")
+        merges = [c for c in fake.calls if "## 分段整理結果" in c["user"]]
+        parts = [c for c in fake.calls if "## 逐字稿（本段" in c["user"]]
+        self.assertEqual(len(merges), 1)
+        self.assertGreater(len(parts), 1)
+        for c in parts:
+            self.assertEqual(c["system"], am.meeting_system("part", with_refs=True))
+            self.assertIn("## 會議文件的相關段落", c["user"])
+        merge = merges[0]
+        self.assertEqual(merge["system"], am.SYSTEM_MERGE_REFS)
+        self.assertIn("## 與會者（參考資料：截圖）", merge["user"])
+        self.assertIn("## 會議資訊（參考資料）", merge["user"])
+        self.assertLess(merge["user"].index("## 會議資訊（參考資料）"), merge["user"].index("## 分段整理結果"))
+        for no in ("## 背景說明", "## 參考資料用字", "## 會議文件的相關段落"):
+            self.assertNotIn(no, merge["user"])
+
+    def test_collected_without_reference(self):
+        self.materials(reference=False)
+        fake = Fake()
+        self.use(fake)
+        res, _ = capture(self.run_am)
+        self.assertEqual(res["reference"], {"source": "collected", "docs_read": 1, "terms": res["reference"]["terms"],
+                                            "participants": 0})
+        u = fake.calls[0]["user"]
+        self.assertIn("## 背景說明（使用者提供）", u)
+        self.assertNotIn("## 與會者（參考資料", u)
+        self.assertNotIn("## 會議資訊（參考資料", u)
+        md = self.md()
+        self.assertIn("| 日期時間 | （待確認）（長度 00:10:00） |", md)
+        self.assertIn("；送出逐字稿文字、背景說明、會議文件 1 份的名詞與段落；截圖沒有送給摘要\n", md)
+        self.assertIn("| 與會者 | 陳怡君（S1） |", md)                                # 沒有截圖對應時照 2.1.0
+
+    def test_no_refs_same_as_210(self):
+        """沒有參考資料、或 --no-refs ＋ --no-context：系統提示詞與使用者訊息相同；不寫 reference 欄位與檢查點。"""
+        self.write()
+        fake = Fake()
+        self.use(fake)
+        res, _ = capture(self.run_am)
+        base = fake.calls[0]
+        self.assertIs(base["system"], am.SYSTEM_MINUTES)
+        self.assertNotIn("reference", res)
+        self.assertNotIn("reference", self.rec())
+        self.assertIn("依據 `transcript.md`，一次整理；只送逐字稿文字\n", self.md())
+        self.assertFalse([e for e in runlog.read_events(self.out / runlog.LOG_NAME) if e.get("name") == "minutes.refs"])
+        write_reference(self.out)
+        (self.parent / "demo.context.md").write_text("背景", encoding="utf-8")
+        fake2 = Fake()
+        self.use(fake2)
+        res, _ = capture(self.run_am, force=True, refs_opts={"no_refs": True, "no_context": True})
+        self.assertIs(fake2.calls[0]["system"], am.SYSTEM_MINUTES)
+        self.assertEqual(fake2.calls[0]["user"], base["user"])
+        self.assertNotIn("reference", res)
+        self.assertIn("| 日期時間 | （待確認）", self.md())
+
+    def test_flags(self):
+        self.write()
+        extra = self.parent / "其他" / "附件.txt"
+        extra.parent.mkdir()
+        extra.write_text(REF_DOC + "。\n", encoding="utf-8")
+        fake = Fake()
+        self.use(fake)
+        res, _ = capture(self.run_am, refs_opts={"context": "示範證券 v3 上線準備週會\n第二行不要", "refs": [str(extra)],
+                                                 "no_refs": False, "no_context": False})
+        ctx = (self.out / "context.md").read_text(encoding="utf-8")
+        self.assertTrue(ctx.startswith("---\nsource: entry\ncreated_at: "))
+        self.assertTrue(ctx.endswith("---\n示範證券 v3 上線準備週會\n"))
+        u = fake.calls[0]["user"]
+        self.assertEqual(sec_of(u, "背景說明"), "示範證券 v3 上線準備週會")
+        self.assertIn(f"- （附件.txt）{REF_DOC}", u)
+        self.assertEqual(res["reference"]["docs_read"], 1)
+        fake = Fake()                                                     # --no-refs：不讀文件，context.md 照讀
+        self.use(fake)
+        capture(self.run_am, force=True, refs_opts={"refs": [str(extra)], "no_refs": True})
+        self.assertNotIn("附件.txt", fake.calls[0]["user"])
+        self.assertIn("## 背景說明", fake.calls[0]["user"])
+        fake = Fake()                                                     # --no-context：不讀 context.md，文件照讀
+        self.use(fake)
+        capture(self.run_am, force=True, refs_opts={"refs": [str(extra)], "no_context": True})
+        self.assertNotIn("## 背景說明", fake.calls[0]["user"])
+        self.assertIn("附件.txt", fake.calls[0]["user"])
+
+    def test_cli(self):
+        self.materials()
+        import contextlib
+        import io
+        import sys
+        self.use(Fake())
+        out = io.StringIO()
+        argv = sys.argv
+        try:
+            sys.argv = ["auto_minutes.py", str(self.out), "--context", "補充一句", "--no-refs"]
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                try:
+                    am.main()
+                except SystemExit as ex:
+                    self.assertEqual(ex.code, 0)
+            m = json.loads(out.getvalue().strip().splitlines()[-1])["minutes"]
+            self.assertEqual((m["status"], m["reference"]["docs_read"], m["reference"]["participants"]), ("ok", 0, 3))
+            self.assertIn("補充一句", (self.out / "context.md").read_text(encoding="utf-8"))
+            sys.argv = ["auto_minutes.py", str(self.out), "--no-frames"]                # 摘要沒有 --no-frames（不送圖）
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as cm:
+                    am.main()
+            self.assertEqual(cm.exception.code, 2)
+        finally:
+            sys.argv = argv
+
+    def test_unreadable_doc_line(self):
+        self.materials(reference=False, context=False, doc=False)
+        (self.parent / "demo.壞.docx").write_bytes(b"not a zip")
+        self.use(Fake())
+        res, console = capture(self.run_am)
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("會議文件 1 份沒有讀到（讀不了 1）", console)
+        self.assertEqual(res["reference"]["docs_read"], 0)
+        self.assertIn("只送逐字稿文字", self.md())                                       # 沒有可送的段落 → 與 2.1.0 相同
+
+    def test_notes_type_and_render_only(self):
+        self.materials()
+        fake = Fake([notes_result("course")])
+        self.use(fake)
+        res, _ = capture(self.run_am, content_type="course")
+        self.assertEqual(res["status"], "ok")
+        self.assertEqual(fake.calls[0]["system"], ct.system_of("course", "single", with_refs=True))
+        notes = (self.out / "notes.md").read_text(encoding="utf-8")
+        self.assertIn("| 日期時間 | 2026-11-03 14:00–14:30（截圖）（長度 00:10:00） |", notes)
+        self.assertIn("| 講者 | 陳怡君（截圖）（S1）：講師；林家豪（截圖）（S2）：SRE；張雅婷（截圖，未對應代號）：後端 |", notes)
+        self.assertIn("- 講者對應：S1：摘要寫 王老師、截圖對應 陳怡君，採截圖", notes)
+        self.assertIn("截圖沒有送給摘要（校正時認出的與會者 3 位已參考）", notes)
+        (self.out / "notes.md").unlink()
+        capture(am.render_only, self.out, cfg={}, html=False)
+        self.assertEqual((self.out / "notes.md").read_text(encoding="utf-8"), notes)
+
+
+@unittest.skipUnless(V22 and (_testenv.HERE.parent / "meeting-minutes-pro-v2.1.0").is_dir(), "需要 2.1.0 目錄")
+class MinutesRegressionV21(unittest.TestCase):
+    """§11.6：沒有參考資料時，摘要的系統提示詞（會議單段／分段／彙整／補判、6 種非會議類型的單段／分段／範本／彙整）與
+    使用者訊息，在獨立行程跑 2.1.0 與 2.2.0 逐位元相同。"""
+
+    PROBE = "\n".join([
+        "import json, sys",
+        "sys.path.insert(0, sys.argv[1])",
+        "import auto_minutes as am, content_types as ct",
+        "paras = [{'time': '00:00:00', 'spk': 'S1', 'text': '今天確認三件事。'}, {'time': '00:01:00', 'spk': 'S2', 'text': '再研究一下。'}]",
+        "meta = {'source': 'demo.wav', 'duration': 600.0, 'speakers': 2, 'hotwords': 'Kafka'}",
+        "out = {'single': am.meeting_system('single'), 'part': am.meeting_system('part'), 'tpl': am.meeting_system('single', True),",
+        "       'merge': am.SYSTEM_MERGE, 'recheck': am.SYSTEM_RECHECK,",
+        "       'user1': am.render_input(paras, meta, hints=am.hedge_hints(paras)),",
+        "       'user2': am.render_input(paras[:1], meta, (1, 2), [], paras[1:])}",
+        "for c in ct.CODES:",
+        "    if c != 'meeting':",
+        "        out[c] = [ct.system_of(c, 'single'), ct.system_of(c, 'part'), ct.system_of(c, 'single', True), ct.merge_system(c)]",
+        "print(json.dumps(out, ensure_ascii=False))",
+    ])
+
+    def test_bit_identical(self):
+        import subprocess
+        import sys
+        got = {}
+        for v in ("2.1.0", _testenv.VERSION):
+            scripts = _testenv.HERE.parent / f"meeting-minutes-pro-v{v}" / "payload" / "runtime" / "scripts"
+            r = subprocess.run([sys.executable, "-B", "-c", self.PROBE, str(scripts)], capture_output=True, text=True,
+                               encoding="utf-8", env=dict(os.environ, PYTHONIOENCODING="utf-8"), timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            got[v] = json.loads(r.stdout)
+        self.assertEqual(sorted(got["2.1.0"]), sorted(got[_testenv.VERSION]))
+        for k in got["2.1.0"]:
+            self.assertEqual(got["2.1.0"][k], got[_testenv.VERSION][k], k)
 
 
 if __name__ == "__main__":

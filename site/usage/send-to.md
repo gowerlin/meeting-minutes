@@ -42,12 +42,12 @@ description: 入口每一題的意思與建議答法（附畫面文字），以�
 ## 轉寫完成後的題目
 
 ```text
-AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）：約 9 分鐘、API 等價約 US$0.46～0.60；逐字稿文字會送到 OpenAI
+AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）：約 9 分鐘、API 等價約 US$0.46～0.60（截圖整理另約 15～30 秒）；逐字稿文字、截圖 5 張、會議文件 2 份的名詞與段落會送到 OpenAI
 要做 AI 校正嗎？[Y/n]
 ```
 
 ```text
-會議摘要：OpenAI gpt-6.1-sol（依校正版逐字稿整理）：約 8～10 分鐘、API 等價約 US$0.29～0.44；逐字稿文字會送到 OpenAI
+會議摘要：OpenAI gpt-6.1-sol（依校正版逐字稿整理）：約 8～10 分鐘、API 等價約 US$0.29～0.44；逐字稿文字、會議文件 2 份的名詞與段落、背景說明、校正時整理的參考資料（不含截圖）會送到 OpenAI
 要產生會議摘要嗎？[Y/n]
 ```
 
@@ -55,9 +55,10 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 |---|---|---|
 | 要做 AI 校正嗎？ | 讓 AI 修正錯字、產出校正版逐字稿（[AI 校正](/features/ai-correction#ai-校正)） | 一般會議按 Enter（是）。含個資、不能送雲端的錄音輸入 `n` |
 | 要產生會議摘要嗎？ | 讓 AI 整理出會議記錄（類型不是會議時，會改問「要產生課程筆記嗎？」這類題目） | 想直接拿到會議記錄就按 Enter（是） |
+| 背景說明（一行） | 2.2 起，回答「是」之後、而且錄音旁沒有說明檔時才問：輸入會議名稱、與會者全名，幫 AI 補上姓名與日期（[參考資料](/features/reference#背景說明)） | 直接按 Enter 跳過也可以 |
 | 用哪個模型？ | 回答「是」之後才問，列出可用的模型、預估時間與費用 | 按 Enter 用預設；想快一點可以選 Claude sonnet |
 
-- 每一題都寫明逐字稿會送到哪一家。**音檔與截圖不會送出**。
+- 每一題都寫明這次要送什麼、送到哪一家：逐字稿文字一定有；錄影做 AI 校正時另有**影片截圖**（最多 8 張，縮小後），有放背景說明或會議文件時也會列出。**音檔與文件原檔不會送出**；會議摘要不送截圖。不想送截圖：`config.json` 的 `reference.frames` 改成 `false`（見[參考資料](/features/reference#怎麼關)）。
 - 錄音超過 2 小時時，說明會變成黃色的 ⚠ 提醒，寫明比較長的時間與費用。
 - 找不到 `claude` 或 `codex` 指令（或沒登入）時，這兩題都不問，結束畫面會寫怎麼安裝、登入，以及之後怎麼補做。
 - 轉寫或 AI 處理要等好幾分鐘，這段時間不小心按到 Enter 也沒關係：每一題出現前會先清掉之前的按鍵。
@@ -88,6 +89,8 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 | `meeting-minutes.html`、`notes.html` | 會議記錄或筆記的[網頁版](/features/web)（2.1），用瀏覽器打開；找得到原始錄音時時間碼可點播放 |
 | `notes.md`、`notes.json` | 課程、訪談等類型的筆記與它的結構化資料 |
 | `frames/frame_0003_001523.jpg` | 影片截圖，檔名裡的 `001523` 代表 00:15:23 |
+| `reference.json` | 參考資料整理（2.2）：AI 從截圖、文件認出的與會者、講者對應、會議日期與名詞（[參考資料](/features/reference)） |
+| `context.md` | 入口輸入的背景說明（2.2），重跑時沿用 |
 | `auto_correct.json`、`auto_minutes.json` | AI 校正與會議摘要的執行紀錄（不含逐字稿內容與金鑰） |
 | `run_log.jsonl` | 這一場的[執行 log](/features/run-log) |
 

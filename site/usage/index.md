@@ -21,7 +21,7 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 
 <StepFlow :steps="[
   { title: '轉寫（本機）', text: '轉檔、說話者分離、語音辨識、繁體轉換、對照表替換、分段標點、截圖。' },
-  { title: 'AI 校正（選用）', text: '只送逐字稿文字給 Claude 或 OpenAI，產出校正版逐字稿與對照表建議。' },
+  { title: 'AI 校正（選用）', text: '把逐字稿文字（錄影另有最多 8 張截圖、背景說明與會議文件的名詞）送給 Claude 或 OpenAI，產出校正版逐字稿與對照表建議。' },
   { title: '整理（選用）', text: '會議記錄或課程、訪談等筆記，每一項附時間碼。' },
   { title: '你確認', text: '對照時間碼回聽決議與待辦；確認對照表建議，下次更準。' }
 ]" />
@@ -38,5 +38,6 @@ description: 三種用法比較：右鍵「傳送到」與拖放、Claude CLI／
 | `meeting-minutes.html` 或 `notes.html` | 網頁版，用瀏覽器打開，時間碼點了播放（見[網頁版](/features/web)） |
 | `transcript.cues.srt`、`transcript.corrected.srt` | 字幕（見[字幕](/features/subtitles)） |
 | `frames/` | 影片截圖，檔名裡的 `001523` 代表 00:15:23 |
+| `reference.json`、`context.md` | 參考資料整理與背景說明（2.2，有做 AI 校正或摘要時；見[參考資料](/features/reference)） |
 
 完整的檔案清單見[右鍵「傳送到」與拖放 › 輸出資料夾](/usage/send-to#輸出資料夾裡有什麼)。

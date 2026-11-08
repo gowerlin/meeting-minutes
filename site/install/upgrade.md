@@ -1,6 +1,6 @@
 ---
 title: 升級與解除安裝
-description: 從 1.x 升級到 2.0 要注意什麼、升級時保留哪些檔，以及怎麼解除安裝。
+description: 從 1.x 升級到 2.0、從 2.1 升級到 2.2 要注意什麼、升級時保留哪些檔，以及怎麼解除安裝。
 ---
 
 # 升級與解除安裝
@@ -30,7 +30,15 @@ description: 從 1.x 升級到 2.0 要注意什麼、升級時保留哪些檔，
 
 2.0.0 → 2.0.1 → 2.0.2：功能、設定鍵、輸出檔都相同，重新執行安裝程式即可。
 
-2.0.x → <MmVersion />：重新執行安裝程式即可。多了[網頁版](/features/web)（`meeting-minutes.html`／`notes.html`），`config.json` 會補上 `html` 區塊；既有的設定、詞表、輸出檔與入口題目都不變。
+2.0.x → 2.1.x：重新執行安裝程式即可。多了[網頁版](/features/web)（`meeting-minutes.html`／`notes.html`），`config.json` 會補上 `html` 區塊；既有的設定、詞表、輸出檔與入口題目都不變。
+
+2.1.x → <MmVersion />：重新執行安裝程式即可，會自動安裝讀 PDF 用的 `pypdf`。`config.json` 會補上 `reference`、`consistency` 區塊（預設全開），既有的設定、詞表與輸出檔都不變。要注意的改變：
+
+1. **AI 校正會送出影片截圖**（最多 8 張，縮小後），用來補上與會者全名與會議日期；不想送：`config.json` 的 `reference.frames` 改成 `false`（見[參考資料](/features/reference)）。
+2. **入口可能多一題「背景說明（一行）」**：答應 AI 校正或摘要、而且錄音旁沒有說明檔時才問，直接按 Enter 跳過；不想被問：`reference.ask_context` 改成 `false`。
+3. **新檔案**：輸出資料夾可能多 `reference.json`、`context.md`；校正版與會議記錄裡同一個英文名詞的寫法會[統一](/features/consistency)。
+
+從 2.0.x 直接升到 <MmVersion /> 也只要重新執行一次安裝程式，上面兩段的改變都會一起套用。
 
 各版改了什麼見[更版紀錄](/releases)。
 

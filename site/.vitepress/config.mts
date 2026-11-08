@@ -108,6 +108,8 @@ const sidebar: DefaultTheme.Sidebar = {
         { text: '自訂範本', link: '/features/custom-templates' },
         { text: '字幕', link: '/features/subtitles' },
         { text: '網頁版', link: '/features/web' },
+        { text: '參考資料', link: '/features/reference' },
+        { text: '全文用字統一', link: '/features/consistency' },
         { text: '說話者分離與講者人數', link: '/features/diarization' },
         { text: 'AI 校正與會議摘要', link: '/features/ai-correction' },
         { text: '提升準確度', link: '/features/accuracy' },
