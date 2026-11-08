@@ -141,7 +141,7 @@ AI 校正：OpenAI gpt-6.1-sol（產出 transcript.corrected.md，原稿不改�
 
 ## Claude 桌面 App
 
-App 的沙盒不跑上面的程式。你在對話中附上截圖（`frames` 裡的圖或自己的螢幕截圖）、會議文件或 `reference.json`，Claude 自己讀，規則相同：人名與名詞以參考資料為準、內容以逐字稿為準，補上的姓名同樣標「（截圖）」。截圖很多時，Claude 最多看 8 張。見 [Claude 桌面 App](/usage/claude-app)。
+App 的沙盒不跑上面的程式。你在對話中附上截圖（`frames` 裡的圖或自己的螢幕截圖）、會議文件或 `reference.json`，Claude 自己讀，規則相同：人名與名詞以參考資料為準、內容以逐字稿為準，補上的姓名同樣標「（截圖）」。截圖很多時，Claude 最多看 8 張。附上的內容會送到 Anthropic 的雲端，對話中不會先問。見 [Claude 桌面 App](/usage/claude-app)。
 
 ## 已知限制
 

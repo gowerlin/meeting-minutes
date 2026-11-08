@@ -26,6 +26,10 @@ Claude 會依序：
 3. 校正字詞，產出 `transcript.corrected.md` 與 `meeting-minutes.md`。
 4. 列出建議加進[對照表](/features/accuracy#固定錯誤對照表)的項目，請你確認後才寫入。
 
+::: warning 逐字稿會送到雲端
+第 1 步在你的電腦上做，音檔不會送出；第 2、3 步 Claude 讀到的逐字稿與截圖，會送到 Anthropic 的雲端由 Claude 處理。對話中沒有「要送出嗎？」這一步，有機敏內容時請不要在對話中讀逐字稿。
+:::
+
 ## 給的資訊越多越準
 
 | 你提供 | 幫助 |
