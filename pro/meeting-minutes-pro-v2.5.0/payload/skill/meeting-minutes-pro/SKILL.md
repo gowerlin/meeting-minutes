@@ -1,8 +1,8 @@
 ---
 name: meeting-minutes-pro
-description: 進階版會議記錄 skill。把會議錄音、錄影或逐字稿整理成繁體中文會議記錄（摘要、決議、待辦、待釐清問題，附時間碼），並另外產出標示修改處的校正版逐字稿；支援會議、課程、訪談、操作教學、座談、工作坊、需求訪談 7 種內容類型與自訂範本（非會議類型產出 notes.md 筆記）、AI 校正與摘要可參考影片截圖、背景說明與會議文件（PDF、PPTX、DOCX）、校正版字幕（transcript.cues.srt、transcript.corrected.srt）、選用的 GPU 說話者分離（NVIDIA，pyannote）、會議記錄與筆記的網頁版（時間碼可點播放）；固定誤辨識會累積到錯誤對照表，下次轉寫時自動替換；中英夾雜很重的技術會議可改用 Breeze-ASR-25；本機自動分段標點；右鍵／拖放轉寫完會詢問要不要做 AI 校正與會議摘要（GPT 或 Claude），每次執行都留下執行 log（各步驟耗時、token、API 等價費用）；機敏會議可用本機限定（不送雲端，輸出資料夾有 local-only.json）。本機有 runtime 時在本機轉寫（Windows／macOS，硬體在安裝時選定），在 Claude App 沙盒中則讀取使用者附上的 transcript.md 或 transcript.corrected.md。當使用者要分析會議錄音或錄影、產生會議記錄、逐字稿、校正版逐字稿、meeting minutes 或 transcript，或要整理課程、演講、Podcast、訪談、操作教學、座談、工作坊、需求訪談的錄音成筆記或字幕，或提到 meeting-minutes-pro、Breeze、錯誤對照表、自動校正、會議摘要、內容類型、自訂範本、字幕、說話者分離、執行 log、網頁版、參考資料、背景說明、會議文件、定稿逐字稿、本機限定、機敏會議時使用。
+description: 進階版會議記錄 skill。把會議錄音、錄影或逐字稿整理成繁體中文會議記錄（摘要、決議、待辦、待釐清問題，附時間碼），並另外產出標示修改處的校正版逐字稿；支援會議、課程、訪談、操作教學、座談、工作坊、需求訪談 7 種內容類型與自訂範本（非會議類型產出 notes.md 筆記）、AI 校正與摘要可參考影片截圖、背景說明與會議文件（PDF、PPTX、DOCX）、校正版字幕（transcript.cues.srt、transcript.corrected.srt）、選用的 GPU 說話者分離（NVIDIA，pyannote）、會議記錄與筆記的網頁版（時間碼可點播放）；固定誤辨識會累積到錯誤對照表，下次轉寫時自動替換；中英夾雜很重的技術會議可改用 Breeze-ASR-25，會議有人講台語或華台混講可改用 Breeze-ASR-26（台語翻成華語文字）；本機自動分段標點；右鍵／拖放轉寫完會詢問要不要做 AI 校正與會議摘要（GPT 或 Claude），每次執行都留下執行 log（各步驟耗時、token、API 等價費用）；機敏會議可用本機限定（不送雲端，輸出資料夾有 local-only.json）。本機有 runtime 時在本機轉寫（Windows／macOS，硬體在安裝時選定），在 Claude App 沙盒中則讀取使用者附上的 transcript.md 或 transcript.corrected.md。當使用者要分析會議錄音或錄影、產生會議記錄、逐字稿、校正版逐字稿、meeting minutes 或 transcript，或要整理課程、演講、Podcast、訪談、操作教學、座談、工作坊、需求訪談的錄音成筆記或字幕，或提到 meeting-minutes-pro、Breeze、台語、華台混講、錯誤對照表、自動校正、會議摘要、內容類型、自訂範本、字幕、說話者分離、執行 log、網頁版、參考資料、背景說明、會議文件、定稿逐字稿、本機限定、機敏會議時使用。
 ---
-<!-- meeting-minutes-pro-version: 2.4.1 -->
+<!-- meeting-minutes-pro-version: 2.5.0 -->
 
 # 會議記錄（Pro）
 
@@ -12,7 +12,7 @@ Pro 版比基本版多十四件事：
 
 1. **固定錯誤對照表**（`corrections.tsv`）：轉寫後自動替換固定誤辨識，對照表會越用越完整。
 2. **校正版逐字稿**（`transcript.corrected.md`）：標出每一處修改，方便回頭查證。
-3. **Breeze-ASR-25**：中英夾雜很重的技術會議用這個模型，比 turbo 準。
+3. **Breeze-ASR-25／Breeze-ASR-26**：中英夾雜很重的技術會議用 Breeze-ASR-25，比 turbo 準；〔2.5〕會議有人講台語、華台混講用 Breeze-ASR-26（台語會翻成華語文字）。
 4. **本機分段標點**：轉寫時就依講者、停頓與段長分段並補上標點；OpenCC 詞彙回復表讓「權限」「分區」「帳號」這類詞不會被簡繁轉換改掉。
 5. **自動校正**（選用）：轉寫完成後由 runtime 呼叫 GPT（`codex` 指令）或 Claude（`claude` 指令），直接產出 `transcript.corrected.md` 與對照表建議；對話只需要處理待確認、講者、會議記錄與對照表確認。
 6. **會議摘要**（1.2.0，選用）：runtime 的 `auto_minutes.py` 依 `references/minutes-template.md` 產出 `meeting-minutes.md`（長會議分段整理再彙整）。右鍵／拖放入口轉寫完會依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（按 Enter＝是）。
@@ -125,11 +125,12 @@ macOS 的路徑含空白（`Application Support`），之後的指令一律用�
 - 與會者姓名、會議名稱與日期，用來把 S1、S2 對應到真人
 - 本次特有的專有名詞，對應參數 `--hotwords`。常用名詞放在 `$MMH/glossary.txt`，`corrections.tsv` 的正確寫法也會自動加入提示
 - 〔2.2〕使用者在對話中說了會議背景（會議名稱、與會者全名）而媒體旁沒有說明檔時，做 AI 校正或摘要時加 `--context "<一行>"`（寫進輸出資料夾的 `context.md`，之後重跑沿用）；使用者提到簡報、議程等文件時，請他放在媒體旁並以主檔名開頭命名，或用 `--refs <檔或資料夾>` 指定（步驟 1.1）
-- **模型選擇**：先讀 `"$MMH/config.json"`。若 `profiles.breeze` 存在，代表已安裝 Breeze：
+- **模型選擇**：先讀 `"$MMH/config.json"`。`profiles.breeze` 存在代表已安裝 Breeze-ASR-25，〔2.5〕`profiles.breeze26` 存在代表已安裝 Breeze-ASR-26：
   - 使用者描述為技術會議、中英夾雜很重（大量英文術語、系統名、程式碼），就用 `--whisper breeze`。
+  - 〔2.5〕使用者說會議有人講台語、華台混講（例：社區、長輩、地方、基層訪談），就用 `--whisper breeze26`，並先告訴使用者：台語會翻成**華語文字**（不是台語漢字），真人台語約三成字錯，人名、機關名、否定句要人工核對，不適合直接當正式逐字紀錄。英文術語多的技術會議不要用 breeze26（英文名詞比 25 差）。用 breeze26 時盡量不要加 `--no-diarize`：略過說話者分離時長段雜訊或音樂可能被辨識成句子（轉寫畫面會印同一句提醒），有說話者分離時已自動略過非人聲。
   - 一般會議或沒特別說明時，用預設的 turbo。
-  - 判斷不了就問一次，並附上預估時間：錄音長度 × `profiles.breeze.rtf`，對照 turbo 的錄音長度 × 主後端 `bench` 裡的 rtf（`bench` 是空的就只附 Breeze 的預估）。錄音長度可用 `ffprobe -v error -show_entries format=duration -of csv=p=0 "<檔案>"` 取得。
-  - `profiles` 裡沒有 breeze 時，不要提 Breeze；使用者主動要求才說明需重新執行安裝程式並選擇安裝 Breeze。
+  - 判斷不了就問一次，並附上預估時間：錄音長度 × 對應 profile 的 rtf（`profiles.breeze.rtf` 或 `profiles.breeze26.rtf`），對照 turbo 的錄音長度 × 主後端 `bench` 裡的 rtf（`bench` 是空的就只附 Breeze 的預估）。錄音長度可用 `ffprobe -v error -show_entries format=duration -of csv=p=0 "<檔案>"` 取得。
+  - `profiles` 裡沒有對應的 breeze／breeze26 時，不要提那個模型；使用者主動要求才說明怎麼加裝（Breeze-ASR-25：重新執行安裝程式並選擇安裝；Breeze-ASR-26：`setup_backend.py --breeze26-only`，見疑難排解）。macOS 不提供 Breeze-ASR-26。
 - **自動校正**：
   - 使用者主動要求時加旗標：「自動校正」→ `--correct`；「用 sonnet 自動校正」→ `--claude --correct-model sonnet`；「用 opus 自動校正」→ `--claude --correct-model opus`；「用 GPT／OpenAI／Codex 校正」→ `--openai`（模型另說時加 `--correct-model <模型>`）；「這次不要自動校正」→ `--no-correct`。
   - 使用者沒特別說就**不加旗標**（照 `config.json`）。例外：`correction.enabled` 為 true 且錄音長度（`ffprobe`）超過 `correction.confirm_over_minutes`（預設 120 分鐘）時，先問一次要不要自動校正，附上下表換算的預估時間與費用，並說明逐字稿文字（校正另含截圖與參考資料，見步驟 1.1 的說明）會送到 GPT（OpenAI）或 Claude（Anthropic）；答要就加 `--correct`，不要就加 `--no-correct`。
@@ -172,7 +173,7 @@ AI 校正與會議摘要會一起參考下列資料（`refs.py` 在本機收集�
 ## 2. 本機轉寫
 
 ```bash
-PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speakers 4 --hotwords "名詞1, 名詞2" [--template <代號>] [--no-diarize] [--whisper breeze] [--correct｜--no-correct｜--claude｜--openai] [--context "<一行>"] [--refs <檔或資料夾>] [--no-refs] [--no-context] [--no-frames]
+PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speakers 4 --hotwords "名詞1, 名詞2" [--template <代號>] [--no-diarize] [--whisper breeze｜breeze26] [--correct｜--no-correct｜--claude｜--openai] [--context "<一行>"] [--refs <檔或資料夾>] [--no-refs] [--no-context] [--no-frames]
 ```
 
 - 〔2.0〕`--type`：`meeting`（預設）｜`course`｜`interview`｜`tutorial`｜`panel`｜`workshop`｜`requirements`；`--template <代號>`：自訂範本（無效時 exit 2，訊息照印給使用者，可用 `"$PY" "$MMH/scripts/templates.py" check` 檢查）。類型決定 CPU 說話者分離的分群門檻（共用 0.9、課程 1.0、座談 0.8）與影片畫面門檻（操作教學 0.1），轉寫後寫進 `transcript.json` 的 `meta.content_type`。
@@ -264,7 +265,7 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 - 待辦必須有負責人；逐字稿沒講到期限就寫「未定」，不要推測。
 - 〔1.2.2〕待釐清問題只列會中有人提出、到最後都沒有答覆或決定的問題（和 `auto_minutes.py` 的規則相同）：會中已經有答覆的事（包括「看完某個結果再決定」這種有條件的答覆，寫進議題的結論）、只是在說明現況的話、會中沒有人問而是你自己推想出來的問題，都不列。
 - 只寫會議中實際提到的內容；Claude 自己的建議放在獨立的「補充建議」段落。
-- 在「轉寫品質備註」寫明使用的模型（turbo 或 breeze）與後端、分段標點來源（`meta.punctuation`：CT-Transformer 幾段、Whisper 標點幾段），以及是否自動校正（供應商、模型、通道、完成段數，取自 `meta.correction` 或 `auto_correct.json`），資料取自 `transcript.json` 的 meta。
+- 在「轉寫品質備註」寫明使用的模型（turbo、breeze 或〔2.5〕breeze26）與後端、分段標點來源（`meta.punctuation`：CT-Transformer 幾段、Whisper 標點幾段），以及是否自動校正（供應商、模型、通道、完成段數，取自 `meta.correction` 或 `auto_correct.json`），資料取自 `transcript.json` 的 meta。
 - 流程圖和時序圖一律用 Mermaid。
 - 〔2.1〕**網頁版要跟著重新產生**：你在對話中寫完或修改 `meeting-minutes.md`／`notes.md`、存到輸出資料夾之後，執行
 
@@ -335,6 +336,8 @@ PYTHONUTF8=1 "$PY" "$MMH/scripts/transcribe.py" "<檔案>" --type course --speak
 |---|---|
 | 換了硬體、更新驅動或系統，或載入失敗 | 重新執行 `install.cmd`／`install.command`，或 `"$PY" "$MMH/scripts/setup_backend.py"`（加 `--breeze` 會一併處理 Breeze） |
 | 想事後加裝 Breeze | `"$PY" "$MMH/scripts/setup_backend.py" --breeze-only`。Intel／CPU 電腦會在這一步轉換模型，約 10～20 分鐘 |
+| 〔2.5〕想事後加裝 Breeze-ASR-26（台語） | `"$PY" "$MMH/scripts/setup_backend.py" --breeze26-only`。要約 10 GB 可用空間（暫時下載官方權重約 6.2 GB，轉換後只留約 1.6 GB）；macOS 不提供 |
+| 〔2.5〕移除 Breeze-ASR-26 | `"$PY" "$MMH/scripts/setup_backend.py" --remove-breeze26`（刪模型與 `profiles.breeze26`，其他設定不動） |
 | 對照表替換錯了 | `corrections.py remove "錯誤寫法"`；本次結果可以從 `transcript.json` 的 `raw` 欄位還原，或加 `--no-corrections` 重新轉寫 |
 | 講者數不對 | 指定 `--speakers N`（填實際人數）；未知人數時調整 `--cluster-threshold`，數值越大人數越少（2.0 預設：共用 0.9、課程 1.0、座談 0.8；只影響 CPU 說話者分離） |
 | 〔2.0〕講者太多（零星代號） | 表頭標 ⚠ 的代號先依內容併到相鄰講者；確定人數時重跑並填人數，或把門檻調大 |

@@ -2,7 +2,7 @@
 
 - build_paragraphs()：決定段落邊界（一定落在 segment 邊界）。
 - punctuate_paragraphs()：每段決定標點來源，把結果寫回每個 segment 的 text（加標點前的文字存在 text_plain）。
-  Breeze 一律整段交給 CT-Transformer；其他模型逐個 segment 判斷：標點夠密（每 whisper_density 個內容字元至少 1 個）
+  Breeze（〔2.5.0〕含 Breeze-ASR-26：common.BREEZE_FAMILY）一律整段交給 CT-Transformer；其他模型逐個 segment 判斷：標點夠密（每 whisper_density 個內容字元至少 1 個）
   就沿用 Whisper 標點，不夠密的 segment 單獨交給 CT-Transformer（1.1.0 實測：以 segment 判斷比以段落判斷的 F1 高）。
   CT-Transformer 用簡體語料訓練，所以逐字轉簡體後再標點，標點插回原本的繁體文字。
 """
@@ -290,7 +290,8 @@ def punctuate_paragraphs(paras: list, segs: list, whisper_alias: str, punctuator
     t0 = time.time()
     by = {"whisper": 0, "ct": 0, "mixed": 0, "none": 0, "ct_failed": 0}
     by_seg = {"whisper": 0, "ct": 0, "none": 0, "ct_failed": 0}
-    breeze = whisper_alias == "breeze"
+    from common import BREEZE_FAMILY
+    breeze = whisper_alias in BREEZE_FAMILY           # 〔2.5.0〕breeze26 同 25
     for p in paras:
         a, b = p["segments"]
         idx = list(range(a, b + 1))

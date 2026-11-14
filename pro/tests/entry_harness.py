@@ -32,6 +32,10 @@
 - 〔2.4.1〕v241_scenarios：`local_only_config_broken`（config.json 不是合法 JSON，選項 `config_raw` 原樣寫入）、
   `local_only_config_badvalue`（`privacy.local_only: "true"`）：一般入口也當成本機限定，不問 AI、假 CLI 0 次，
   黃字寫原因（`為了不外送，已當成本機限定`）與「要恢復：修好 …」，結束畫面的解除方法是「全部：修好 …」。
+- 〔2.5.0〕v25_scenarios：「辨識模型」選擇題（規格 2.5.0 §5）。只裝 25、只裝 26、兩個都裝、都沒裝四種組合
+  （config.json 的 profiles.breeze／breeze26），答 b／t／Enter／y／無效字元：轉給 transcribe.py 的 --whisper、
+  無效時的提示只列已安裝的鍵、選 t 的提醒（又略過說話者分離時多一行雜訊提醒，選 b 時沒有）、run_log 的 wait ask_whisper（都沒裝時不問、沒有 ask_whisper）。
+  用全域本機限定（privacy.local_only）省掉 AI 的題目；答案順序：類型、人數、專有名詞、辨識模型（可能兩次）、按 Enter 關閉。
 
 用法：python entry_harness.py --work <暫存目錄> [--shell pwsh powershell bash] [--only 情境名 ...]
 """
@@ -67,6 +71,7 @@ V22 = _testenv.VER >= (2, 2, 0)          # 〔2.2.0〕參考資料
 V23 = _testenv.VER >= (2, 3, 0) or os.environ.get("MMP_TEST_HOTWORDS_CONTROL") == "1"
 V24 = _testenv.VER >= (2, 4, 0)          # 〔2.4.0〕本機限定、供應商名稱 GPT／Claude
 V241 = _testenv.VER >= (2, 4, 1)         # 〔2.4.1〕config.json 讀不了或值看不懂也當成本機限定
+V25 = _testenv.VER >= (2, 5, 0)          # 〔2.5.0〕辨識模型選擇題（Breeze-ASR-26）
 NAMES_24 = (("OpenAI gpt-6.1-sol", "GPT gpt-6.1-sol"), ("會送到 OpenAI", "會送到 GPT（OpenAI）"),
             ("會送到 Anthropic", "會送到 Claude（Anthropic）"), ("：OpenAI", "：GPT"))
 
@@ -306,7 +311,50 @@ def scenarios():
         out.update(v24_scenarios())
     if V241:
         out.update(v241_scenarios())
+    if V25:
+        out.update(v25_scenarios())
     return out
+
+
+def v25_scenarios():
+    """〔2.5.0〕辨識模型選擇題（規格 2.5.0 §5）。全域本機限定 → 沒有 AI 的題目。"""
+    b25 = {"backend": "ct2", "device": "cuda", "compute_type": "int8_float16", "rtf": 0.04}
+    b26 = {"backend": "ct2", "device": "cuda", "compute_type": "int8_float16", "rtf": 0.066}
+    lo = {"privacy": {"local_only": True}}
+    only25, only26, both = dict(lo, profiles={"breeze": b25}), dict(lo, profiles={"breeze26": b26}), \
+        dict(lo, profiles={"breeze": b25, "breeze26": b26})
+    remind = "台語會翻成華語文字；人名、機關名、否定句請人工核對"
+    noise = "沒有說話者分離時，長段雜訊或音樂可能被辨識成句子"   # 只在選 t 而且略過說話者分離時（規格 2.5.0 §6）
+    base = [("calls", ["transcribe"]), ("nocli",)]
+
+    def picked(arg):
+        if arg is None:
+            return [("targ_not", "--whisper"), ("notext", remind), ("notext", noise)]
+        return [("targ2", "--whisper", arg), ("notext", noise)] + ([("text", remind)] if arg == "breeze26" else [("notext", remind)])
+    asked = [("wait", "ask_whisper")]
+    return {
+        "whisper_none": (["claude", "codex"], 0, dict(lo), None, ["", "", "", ""],
+                         base + picked(None) + [("nowait", "ask_whisper"), ("notext", "請輸入 b"), ("notext", "請輸入 t")]),
+        "whisper_25_b": (["claude", "codex"], 0, only25, None, ["", "", "", "b", ""], base + picked("breeze") + asked),
+        "whisper_25_y": (["claude", "codex"], 0, only25, None, ["", "", "", "y", ""], base + picked("breeze") + asked),
+        "whisper_25_enter": (["claude", "codex"], 0, only25, None, ["", "", "", "", ""], base + picked(None) + asked),
+        "whisper_25_t_invalid": (["claude", "codex"], 0, only25, None, ["", "", "", "t", "t", ""], base + picked(None) + asked + [
+            ("text", "請輸入 b，或直接按 Enter（turbo）"), ("text", "沒有這個選項，使用預設（turbo）")]),
+        "whisper_26_t": (["claude", "codex"], 0, only26, None, ["", "", "", "t", ""], base + picked("breeze26") + asked),
+        "whisper_26_enter": (["claude", "codex"], 0, only26, None, ["", "", "", "", ""], base + picked(None) + asked),
+        "whisper_26_b_invalid": (["claude", "codex"], 0, only26, None, ["", "", "", "b", "T", ""], base + picked("breeze26") + asked + [
+            ("text", "請輸入 t，或直接按 Enter（turbo）"), ("notext", "沒有這個選項")]),
+        "whisper_both_b": (["claude", "codex"], 0, both, None, ["", "", "", "B", ""], base + picked("breeze") + asked),
+        "whisper_both_t": (["claude", "codex"], 0, both, None, ["", "", "", "t", ""], base + picked("breeze26") + asked),
+        "whisper_both_enter": (["claude", "codex"], 0, both, None, ["", "", "", "", ""], base + picked(None) + asked),
+        "whisper_both_invalid": (["claude", "codex"], 0, both, None, ["", "", "", "x", "", ""], base + picked(None) + asked + [
+            ("text", "請輸入 b、t，或直接按 Enter（turbo）")]),
+        "whisper_both_t_skip": (["claude", "codex"], 0, both, None, ["", "s", "", "t", ""],
+                                [x for x in base + picked("breeze26") + asked if x != ("notext", noise)] + [
+                                    ("targ", "--no-diarize"), ("text", noise)]),
+        "whisper_both_b_skip": (["claude", "codex"], 0, both, None, ["", "s", "", "b", ""], base + picked("breeze") + asked + [
+            ("targ", "--no-diarize")]),
+    }
 
 
 def v241_scenarios():
@@ -769,6 +817,11 @@ def run_one(shell: str, name: str, spec, work: Path) -> tuple:
                 bad = (c[1] in argv) if c[0] == "targ_not" else ((c[1], c[2]) not in pairs)
                 if bad or x is None:
                     fails.append(f"{c[0]} {c[1:]}：{script} argv {argv}")
+        elif c[0] == "nowait":                          # 〔2.5.0〕沒有這個 wait（都沒裝 Breeze 時不問）
+            rl = out_dir / "run_log.jsonl"
+            evs = [json.loads(line) for line in rl.read_text(encoding="utf-8").splitlines()] if rl.exists() else []
+            if any(e.get("event") == "wait" and e.get("name") == c[1] for e in evs):
+                fails.append(f"run_log 不應有 wait {c[1]}")
         elif c[0] == "wait":
             rl = out_dir / "run_log.jsonl"
             evs = [json.loads(line) for line in rl.read_text(encoding="utf-8").splitlines()] if rl.exists() else []

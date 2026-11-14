@@ -30,7 +30,7 @@ from urllib.parse import quote
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 TEMPLATE_NAME = "html_template.html"
-FALLBACK_VERSION = "2.4.1"          # Claude App 沙盒沒有 common.py 時的版號（tools/make_dist.py 檢查與 common.VERSION 一致）
+FALLBACK_VERSION = "2.5.0"          # Claude App 沙盒沒有 common.py 時的版號（tools/make_dist.py 檢查與 common.VERSION 一致）
 FALLBACK_HTML = {"enabled": True, "media": "auto", "theme": "dark"}
 FALLBACK_CHOICES = {"enabled": (True, False), "media": ("auto", "off"), "theme": ("dark", "light")}
 

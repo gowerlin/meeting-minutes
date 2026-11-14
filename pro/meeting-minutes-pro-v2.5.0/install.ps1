@@ -1,5 +1,5 @@
 ﻿<#
-  meeting-minutes-pro 2.4.1 一鍵安裝程式
+  meeting-minutes-pro 2.5.0 一鍵安裝程式
   - 共用 runtime：%LOCALAPPDATA%\meeting-minutes-pro（Python venv、模型、轉寫腳本、glossary、config）
     設定環境變數 MEETING_MINUTES_PRO_HOME 可改放到其他位置
   - 目標 CLI ：複製 skill 到 %USERPROFILE%\.claude\skills\meeting-minutes-pro（Claude CLI 與桌面版 Code 分頁共用）
@@ -16,6 +16,8 @@
             -ComputeType int8_float16|float16|int8_float32|…（搭配 -Backend，明確指定精度）
             -KeepAll（保留所有後端的模型與套件，預設只留選中的）
             -Breeze / -NoBreeze（是否安裝 Breeze-ASR-25；不指定時會詢問）
+            -Breeze26 / -NoBreeze26（〔2.5.0〕是否安裝 Breeze-ASR-26（台語或華台混講）；不指定時會詢問，預設不裝；
+                                   已經裝過的不問、保留。-NoBreeze26 不會移除已裝的 Breeze-ASR-26）
             -Correct / -NoCorrect（在 Claude CLI 對話或命令列轉寫時是否自動校正；不指定時，第一次安裝會詢問一次。
                                   右鍵「傳送到」入口不受影響：1.2.0 起每次轉寫完都會問要不要做 AI 校正與會議摘要）
             -CorrectProvider auto|claude|openai   -CorrectModel <模型>   -CorrectChannel cli|api
@@ -33,6 +35,8 @@ param(
     [switch]$KeepAll,
     [switch]$Breeze,
     [switch]$NoBreeze,
+    [switch]$Breeze26,
+    [switch]$NoBreeze26,
     [switch]$Correct,
     [switch]$NoCorrect,
     [ValidateSet("", "auto", "claude", "openai")][string]$CorrectProvider = "",
@@ -52,7 +56,7 @@ $ProgressPreference = "SilentlyContinue"   # PS 5.1 的下載進度條會讓 Inv
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PYTHONUTF8 = "1"
-$Version   = "2.4.1"
+$Version   = "2.5.0"
 $Here      = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Payload   = Join-Path $Here "payload"
 if ($env:MEETING_MINUTES_PRO_HOME) { $MMH = $env:MEETING_MINUTES_PRO_HOME }
@@ -459,6 +463,22 @@ if (-not $Breeze -and -not $NoBreeze) {
     $Breeze = -not ($ans -match '^[nN]')
 }
 if ($NoBreeze) { $Breeze = $false }
+# 〔2.5.0〕Breeze-ASR-26（規格 2.5.0 §4）：預設不裝；已裝過（profiles.breeze26）不問、保留；-NoBreeze26 也不移除已裝的
+$b26Installed = [bool](Get-Opt (Read-Config) @("profiles", "breeze26"))
+if (-not $Breeze26 -and -not $NoBreeze26) {
+    if ($b26Installed) {
+        Write-Host ""
+        Write-Host "  Breeze-ASR-26（台語或華台混講）：已安裝，保留（要重新實測請加 -Breeze26）"
+    } else {
+        Write-Host ""
+        Write-Host "  Breeze-ASR-26（MediaTek，台語語音辨識，Apache-2.0）"
+        Write-Host "  - 會議有人講台語、華台混講時用；台語會翻成華語文字（不是台語漢字），人名、機關名、否定句要人工核對"
+        Write-Host "  - 需要約 10 GB 可用空間；安裝時下載官方權重並轉換，多花約 5~20 分鐘"
+        $ans = Read-Host "  是否安裝 Breeze-ASR-26（台語或華台混講；暫時下載約 6.2 GB，轉換後佔 1.6 GB）？[y/N]"
+        $Breeze26 = [bool]($ans -match '^[yY]')
+    }
+}
+if ($NoBreeze26) { $Breeze26 = $false }
 $doCli = $Target -in @("CLI", "Both")
 $doApp = $Target -in @("App", "Both")
 
@@ -696,6 +716,7 @@ if ($ComputeType) {
 }
 if ($KeepAll) { $sbArgs += "--keep-all" }
 if ($Breeze)  { $sbArgs += "--breeze" }
+if ($Breeze26) { $sbArgs += "--breeze26" }      # 〔2.5.0〕
 $sbOut = @()
 # 〔1.2.2〕MMP_INSTALLING=1：config.json 的 runtime_version 要到「更新設定」才更新，這裡的版號提示改印「升級中」而不是「請重新執行安裝程式」
 $env:MMP_INSTALLING = "1"
@@ -710,6 +731,10 @@ if ($choice -and $choice.prune_ct2_packages -and $cudaInstalled) {
     & $VenvPy -m pip uninstall -y faster-whisper ctranslate2 nvidia-cublas-cu12 nvidia-cudnn-cu12 --disable-pip-version-check | Out-Null
 }
 $punctOk = [bool]($choice -and $choice.punct)
+if ($choice -and $choice.breeze26_error) {        # 〔2.5.0〕Breeze-ASR-26 失敗不中止安裝（主模型已設定好）
+    Warn ("Breeze-ASR-26 沒有安裝：{0}" -f $choice.breeze26_error)
+    Warn "之後可執行 `"$VenvPy`" `"$MMH\scripts\setup_backend.py`" --breeze26-only 加裝"
+}
 # 〔2.0.0 規格 §8.4〕GPU 說話者分離實測：用上一步下載的範例音檔跑一次（離線、關閉 pyannote 使用統計）
 if ($GpuResult -and $GpuResult.status -eq "pending_smoke") {
     Step "GPU 說話者分離實測"
@@ -836,6 +861,10 @@ Write-Host "    選定後端：$($cfg.backend) / $($cfg.device) / $($cfg.compute
 if ($cfg.profiles -and $cfg.profiles.breeze) {
     $b = $cfg.profiles.breeze
     Write-Host "    Breeze  ：$($b.backend) / $($b.device)（RTF $($b.rtf)）　轉寫時加 --whisper breeze"
+}
+if ($cfg.profiles -and $cfg.profiles.breeze26) {   # 〔2.5.0〕
+    $b = $cfg.profiles.breeze26
+    Write-Host "    Breeze-26：$($b.backend) / $($b.device)（RTF $($b.rtf)）　轉寫時加 --whisper breeze26（台語或華台混講）"
 }
 Write-Host "    對照表  ：$corr"
 Write-Host "    專有名詞：$gloss"

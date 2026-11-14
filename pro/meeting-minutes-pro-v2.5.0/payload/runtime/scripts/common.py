@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "2.4.1"
+VERSION = "2.5.0"
 
 # backend -> alias -> Hugging Face repo id
 WHISPER_MODELS = {
@@ -18,22 +18,39 @@ WHISPER_MODELS = {
         "large-v3": "OpenVINO/whisper-large-v3-int8-ov",
         "base": "OpenVINO/whisper-base-int8-ov",
         "breeze": "local/breeze-asr-25-int8-ov",          # 沒有現成版本，安裝時由原始模型轉換
+        "breeze26": "local/breeze-asr-26-int8-ov",        # 〔2.5.0〕同上，安裝時由官方權重轉換
     },
     "ct2": {        # faster-whisper / CTranslate2：NVIDIA CUDA，或 macOS 上的 CPU（Apple Accelerate）
         "turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
         "large-v3": "Systran/faster-whisper-large-v3",
         "base": "Systran/faster-whisper-base",
         "breeze": "shdennlin/breeze-asr-25-ct2",          # 依精度下載 int8 / float16 / int8_float16 子資料夾
+        "breeze26": "local/breeze-asr-26-ct2",            # 〔2.5.0〕官方沒有 CTranslate2 版：安裝時由官方權重轉換（breeze.py）
     },
     "mlx": {        # mlx-whisper：Apple Silicon GPU（Metal）
         "turbo": "mlx-community/whisper-large-v3-turbo",
         "large-v3": "mlx-community/whisper-large-v3-mlx",
         "base": "mlx-community/whisper-base-mlx",
         "breeze": "BRlin/Breeze-ASR-25-mlx-fp16",
+        # 〔2.5.0〕breeze26 不提供（社群 MLX 版未驗證；規格 2.5.0 §2.1）
     },
 }
 # Breeze-ASR-25：MediaTek Research 以 Whisper large-v2 微調的台灣華語／中英夾雜模型（Apache-2.0）
 BREEZE_SOURCE = "MediaTek-Research/Breeze-ASR-25"
+# 〔2.5.0〕Breeze-ASR-26：MediaTek Research 以 Whisper large-v2 微調的台語模型（台語語音 → 台灣華語文字；Apache-2.0）。
+# 官方只有 F32 權重：安裝時固定 revision 下載、驗 SHA-256，轉換後刪除原始權重（規格 2.5.0 §3）
+BREEZE26_SOURCE = "MediaTek-Research/Breeze-ASR-26"
+BREEZE26_REVISION = "7b992682e7f5ceedd0a41ebec240f01ba469d19e"
+BREEZE26_WEIGHTS = {                 # 檔名 → (位元組, SHA-256)；取自 Hugging Face 該 revision 的 LFS 資訊
+    "model-00001-of-00002.safetensors": (4992706480, "78e177c9a5228eed20f1f33485f8288bda5308a077fa7758281088c2a3100535"),
+    "model-00002-of-00002.safetensors": (1180663192, "9c1f45081c3a2a606a1dc75e02653770956279d2942015587cf4880879952a7e"),
+}
+BREEZE26_DISK_NEED = 10 * 10**9      # 暫時下載約 6.2 GB＋轉換環境約 1.5 GB＋轉換後約 1.6 GB，取整數
+BREEZE_FAMILY = ("breeze", "breeze26")   # 幾乎不輸出標點：分段標點整段交給 CT-Transformer（punctuate.py）
+# 〔2.5.0〕只對這些（模型, 後端）開 faster-whisper 的 vad_filter（雜訊被編成句子的處置；規格 2.5.0 §6），
+# 而且只在有說話者分離時開：略過說話者分離時量測不符採用條件（真語音 CER 退步超過 1 個百分點），改印 BREEZE26_NO_DIAR_NOTE
+ASR_VAD_FILTER = {("breeze26", "ct2")}
+BREEZE26_NO_DIAR_NOTE = "沒有說話者分離時，長段雜訊或音樂可能被辨識成句子"
 BACKENDS = tuple(WHISPER_MODELS)
 DEFAULT_WHISPER = "turbo"
 
@@ -241,7 +258,19 @@ def whisper_dir(backend: str, alias_or_repo: str) -> Path:
     return models_dir() / backend / whisper_repo(backend, alias_or_repo).split("/")[-1]
 
 
+def model_supported(backend: str, alias: str) -> bool:
+    """〔2.5.0〕這個後端有沒有這個別名（例：mlx 沒有 breeze26）。"""
+    return alias in WHISPER_MODELS.get(backend, {})
+
+
+def asr_vad_filter(model: str, backend: str, diarized: bool = True) -> bool:
+    """〔2.5.0〕轉寫時要不要開 vad_filter：ASR_VAD_FILTER 列的組合，而且有說話者分離（略過說話者分離時不開）。"""
+    return diarized and (model, backend) in ASR_VAD_FILTER
+
+
 def whisper_ready(backend: str, alias: str) -> bool:
+    if alias == "breeze26" and not model_supported(backend, alias):
+        return False                                      # 〔2.5.0〕不提供的後端（mlx）一律未就緒
     d = whisper_dir(backend, alias)
     if backend == "openvino":
         return (d / "openvino_encoder_model.xml").exists()

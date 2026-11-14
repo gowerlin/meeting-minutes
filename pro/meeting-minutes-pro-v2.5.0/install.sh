@@ -1,5 +1,5 @@
 #!/bin/bash
-# meeting-minutes-pro 2.4.1 一鍵安裝程式（macOS Apple Silicon）
+# meeting-minutes-pro 2.5.0 一鍵安裝程式（macOS Apple Silicon）
 #   - 共用 runtime：~/Library/Application Support/meeting-minutes-pro（venv、模型、腳本、glossary、config）
 #     設定環境變數 MEETING_MINUTES_PRO_HOME 可改放到其他位置
 #   - 目標 CLI ：複製 skill 到 ~/.claude/skills/meeting-minutes-pro（Claude CLI 與桌面版 Code 分頁共用）
@@ -15,6 +15,7 @@
 # 其他：--whisper turbo|large-v3   --backend mlx:gpu|ct2:cpu（跳過偵測；後端與裝置和既有設定相同時沿用既有精度，1.2.1）   --keep-all
 #       --compute-type int8|float32|…（搭配 --backend，明確指定精度）
 #       --breeze / --no-breeze（是否安裝 Breeze-ASR-25；不指定時會詢問）
+#       --breeze26 / --no-breeze26（〔2.5.0〕Breeze-ASR-26（台語）：macOS 本版不提供，不詢問；指定 --breeze26 只印說明、略過）
 #       --correct / --no-correct（在 Claude CLI 對話或命令列轉寫時是否自動校正；不指定時，第一次安裝會詢問一次。
 #                                  拖放入口不受影響：1.2.0 起每次轉寫完都會問要不要做 AI 校正與會議摘要）
 #       --correct-provider auto|claude|openai   --correct-model <模型>   --correct-channel cli|api
@@ -26,12 +27,12 @@
 
 set -eo pipefail
 
-VERSION="2.4.1"
+VERSION="2.5.0"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PAYLOAD="$HERE/payload"
 export PYTHONUTF8=1
 
-TARGET=""; WHISPER="turbo"; BACKEND=""; COMPUTE_TYPE=""; KEEP_ALL=""; UNINSTALL=""; BREEZE=""; TEST_ROOT=""
+TARGET=""; WHISPER="turbo"; BACKEND=""; COMPUTE_TYPE=""; KEEP_ALL=""; UNINSTALL=""; BREEZE=""; BREEZE26=""; TEST_ROOT=""
 CORRECT=""; C_PROVIDER=""; C_MODEL=""; C_CHANNEL=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -42,6 +43,8 @@ while [ $# -gt 0 ]; do
         --keep-all)  KEEP_ALL=1; shift ;;
         --breeze)    BREEZE=1; shift ;;
         --no-breeze) BREEZE=0; shift ;;
+        --breeze26)    BREEZE26=1; shift ;;     # 〔2.5.0〕macOS 不提供，見下方
+        --no-breeze26) BREEZE26=0; shift ;;
         --correct)   [ "$CORRECT" = "0" ] && { echo "--correct 與 --no-correct 只能擇一"; exit 2; }; CORRECT=1; shift ;;
         --no-correct) [ "$CORRECT" = "1" ] && { echo "--correct 與 --no-correct 只能擇一"; exit 2; }; CORRECT=0; shift ;;
         --correct-provider) C_PROVIDER="$2"; shift 2 ;;
@@ -203,6 +206,11 @@ if [ -z "$BREEZE" ]; then
     echo "  - 適合中英夾雜很重的技術會議；比 turbo 準，但慢數倍；額外約 3GB"
     read -r -p "  是否安裝 Breeze-ASR-25？[Y/n] " ans
     case "$ans" in [nN]*) BREEZE=0 ;; *) BREEZE=1 ;; esac
+fi
+
+# 〔2.5.0〕Breeze-ASR-26（台語）：macOS 本版不提供（Apple Silicon 的 MLX 社群版未驗證；規格 2.5.0 §2.1）。不詢問、不安裝
+if [ "$BREEZE26" = "1" ]; then
+    warn "macOS 本版不提供 Breeze-ASR-26（台語或華台混講），這次略過；其他設定照常安裝"
 fi
 
 # ------------------------------------------------------------------ 自動校正（選用）：偵測與詢問（只問一次）

@@ -94,6 +94,18 @@ Claude App 裡的 skill 在雲端的沙盒裡執行，用不到你電腦的顯�
 選完之後會依序問：
 
 1. **要不要安裝 Breeze-ASR-25**（預設安裝）：一個對台灣華語、中英夾雜的技術會議比較準的辨識模型，速度比預設模型慢好幾倍。裝了之後每次轉寫可以選要不要用（見[提升準確度](/features/accuracy#breeze-asr-25)）。
+1. **要不要安裝 Breeze-ASR-26**（2.5 起，**預設不裝**；macOS 不問）：會議有人講台語、華台混講時用的模型，台語會翻成華語文字（見[提升準確度 › Breeze-ASR-26](/features/accuracy#breeze-asr-26-台語)）。
+
+   ```text
+     Breeze-ASR-26（MediaTek，台語語音辨識，Apache-2.0）
+     - 會議有人講台語、華台混講時用；台語會翻成華語文字（不是台語漢字），人名、機關名、否定句要人工核對
+     - 需要約 10 GB 可用空間；安裝時下載官方權重並轉換，多花約 5~20 分鐘
+     是否安裝 Breeze-ASR-26（台語或華台混講；暫時下載約 6.2 GB，轉換後佔 1.6 GB）？[y/N]
+   ```
+
+   - 要約 **10 GB** 可用空間（裝 runtime 的那顆磁碟）：暫時下載官方權重約 6.2 GB，在你的電腦上轉換後只留約 1.6 GB，暫存檔會刪掉。空間不夠、下載或轉換失敗時，畫面寫原因，其他部分照常裝完。
+   - 已經裝過的不會再問，重新安裝也會保留。不詢問直接裝：`install.cmd -Target Both -Breeze26`。
+   - 之後才想裝（不用重跑整個安裝）：`"%LOCALAPPDATA%\meeting-minutes-pro\venv\Scripts\python.exe" "%LOCALAPPDATA%\meeting-minutes-pro\scripts\setup_backend.py" --breeze26-only`；移除：同一支加 `--remove-breeze26`。
 2. **要不要開啟自動校正**（預設不開，只在第一次安裝時問）：這只影響 Claude CLI 對話裡的行為。右鍵與拖放轉寫**每次轉寫完都會問你**，跟這裡的答案無關。畫面會寫出偵測到哪個 AI 工具、會送到哪一家（找得到已登入的 `codex` 時用 GPT（OpenAI），否則用 Claude（Anthropic））：
 
    ```text

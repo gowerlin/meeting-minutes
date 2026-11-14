@@ -20,6 +20,7 @@ meeting-minutes-pro 與基本版 meeting-minutes 以 **MIT License** 授權，�
 | NVIDIA cuBLAS / cuDNN（pip 套件） | CUDA 函式庫（只在 Windows 且有 NVIDIA 顯示卡時安裝） | NVIDIA 授權 |
 | [MLX](https://github.com/ml-explore/mlx) / mlx-whisper | 推論引擎（macOS：Apple GPU） | MIT |
 | [optimum-intel](https://github.com/huggingface/optimum-intel) | Breeze 轉換成 OpenVINO 格式（只在安裝時暫用；Pro） | Apache-2.0 |
+| [Transformers](https://github.com/huggingface/transformers)、[PyTorch](https://github.com/pytorch/pytorch)（CPU 版）、[CTranslate2](https://github.com/OpenNMT/CTranslate2) 轉換工具 | Breeze-ASR-26 轉換成 CTranslate2 格式（只在安裝時暫用；Pro 2.5） | Apache-2.0、BSD-3-Clause、MIT |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | 說話者分離、標點模型的執行 | Apache-2.0 |
 | [OpenCC](https://github.com/BYVoid/OpenCC)（Python 實作） | 簡繁轉換 | Apache-2.0 |
 | [FFmpeg](https://ffmpeg.org/) | 音訊與影片處理（另行安裝） | LGPL／GPL |
@@ -34,6 +35,7 @@ meeting-minutes-pro 與基本版 meeting-minutes 以 **MIT License** 授權，�
 |---|---|---|
 | Whisper large-v3-turbo（OpenVINO INT8、CTranslate2、MLX 版） | 語音辨識 | MIT |
 | [Breeze-ASR-25](https://huggingface.co/MediaTek-Research/Breeze-ASR-25)（含 CTranslate2、MLX 版；選裝，Pro） | 台灣華語／中英夾雜語音辨識 | Apache-2.0 |
+| [MediaTek Research Breeze-ASR-26](https://huggingface.co/MediaTek-Research/Breeze-ASR-26)（官方權重，revision `7b992682e7f5ceedd0a41ebec240f01ba469d19e`；選裝，Pro 2.5） | 台語語音辨識（輸出台灣華語文字）；安裝時在使用者電腦上轉換，原始權重轉完刪除，本專案不散布權重 | Apache-2.0 |
 | pyannote segmentation 3.0（sherpa-onnx 轉換版） | 語音分段 | MIT |
 | 3D-Speaker ERes2Net | 中文聲紋（說話者分離） | Apache-2.0 |
 | CT-Transformer 標點模型（Alibaba 通義實驗室 FunASR；sherpa-onnx int8 版；Pro） | 本機分段標點 | FunASR Model Open Source License 1.1 |

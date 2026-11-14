@@ -15,6 +15,7 @@
 | NVIDIA cuBLAS／cuDNN（pip 套件） | CUDA 函式庫（只在 Windows 且有 NVIDIA 顯示卡時安裝） | https://pypi.org/project/nvidia-cublas-cu12/ 、https://pypi.org/project/nvidia-cudnn-cu12/ | NVIDIA 授權 | 兩版 |
 | MLX／mlx-whisper | 推論引擎（macOS：Apple GPU） | https://github.com/ml-explore/mlx 、https://github.com/ml-explore/mlx-examples/tree/main/whisper | MIT | 兩版 |
 | optimum-intel | Breeze 轉換成 OpenVINO 格式（只在安裝時暫用） | https://github.com/huggingface/optimum-intel | Apache-2.0 | Pro |
+| Transformers、PyTorch（CPU 版）、CTranslate2 轉換工具 | Breeze-ASR-26 轉換成 CTranslate2 格式、產生 `tokenizer.json`（只在安裝時暫用，裝在暫時環境，轉完刪除） | https://github.com/huggingface/transformers 、https://github.com/pytorch/pytorch 、https://github.com/OpenNMT/CTranslate2 | Apache-2.0、BSD-3-Clause、MIT | Pro 2.5 |
 | sherpa-onnx | 說話者分離；CT-Transformer 標點模型的執行 | https://github.com/k2-fsa/sherpa-onnx | Apache-2.0 | 兩版（標點只有 Pro） |
 | OpenCC（Python 實作） | 簡繁轉換 | https://github.com/BYVoid/OpenCC | Apache-2.0 | 兩版 |
 | FFmpeg | 音訊與影片處理（由 winget 或 Homebrew 另行安裝） | https://ffmpeg.org/ | LGPL／GPL | 兩版 |
@@ -25,9 +26,20 @@
 |---|---|---|---|---|
 | Whisper large-v3-turbo（OpenVINO INT8、CTranslate2、MLX 版） | 語音辨識 | https://huggingface.co/OpenVINO/whisper-large-v3-turbo-int8-ov 、https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo 、https://huggingface.co/mlx-community/whisper-large-v3-turbo | MIT | 兩版 |
 | Breeze-ASR-25（原始版、CTranslate2 版、MLX 版；選裝） | 台灣華語／中英夾雜語音辨識 | https://huggingface.co/MediaTek-Research/Breeze-ASR-25 、https://huggingface.co/shdennlin/breeze-asr-25-ct2 、https://huggingface.co/BRlin/Breeze-ASR-25-mlx-fp16 | Apache-2.0 | Pro |
+| MediaTek Research Breeze-ASR-26（官方權重；選裝） | 台語語音辨識（輸出台灣華語文字）；安裝時在使用者電腦上轉換，見下一節 | https://huggingface.co/MediaTek-Research/Breeze-ASR-26 | Apache-2.0 | Pro 2.5 |
 | pyannote segmentation 3.0（sherpa-onnx 轉換版） | 語音分段 | https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models | MIT | 兩版 |
 | 3D-Speaker ERes2Net（中文聲紋） | 說話者分離 | https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models | Apache-2.0 | 兩版 |
 | CT-Transformer 標點模型 | 本機分段標點 | 見下一節 | FunASR Model Open Source License 1.1 | Pro |
+
+## MediaTek Research Breeze-ASR-26（Pro 2.5 起，選裝；安裝時下載並轉換，不包含在安裝包內）
+
+- 模型名稱：Breeze-ASR-26（MediaTek Research 以 Whisper large-v2 架構訓練的台語語音辨識模型，輸出台灣華語文字）
+- 來源：https://huggingface.co/MediaTek-Research/Breeze-ASR-26 ，固定使用 revision `7b992682e7f5ceedd0a41ebec240f01ba469d19e`
+  （安裝程式下載後比對兩個權重檔的大小與 SHA-256）
+- 授權：Apache License 2.0（全文：https://www.apache.org/licenses/LICENSE-2.0 ）
+- 使用方式：只在使用者選裝時，安裝程式下載官方權重，在本機轉換成 CTranslate2（NVIDIA）或 OpenVINO INT8（Intel／CPU）格式，
+  轉換後刪除原始權重。本專案不散布模型權重或轉換結果。
+- 依官方說明，訓練資料全部是合成台語語音（約一萬小時）；輸出是台灣華語文字（台語會翻成華語），不是台語漢字或台羅。
 
 ## CT-Transformer 標點模型（Pro；安裝時下載，不包含在安裝包內）
 

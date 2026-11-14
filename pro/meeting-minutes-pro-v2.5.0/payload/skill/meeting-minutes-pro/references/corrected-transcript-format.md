@@ -21,7 +21,7 @@
 ```markdown
 # 校正版逐字稿：<來源檔名>
 
-> 原始逐字稿：`transcript.md`（未修改）｜模型：<turbo/breeze> @ <後端/裝置>｜校正：Claude｜<日期>
+> 原始逐字稿：`transcript.md`（未修改）｜模型：<turbo/breeze/breeze26> @ <後端/裝置>｜校正：Claude｜<日期>
 > 參考資料：截圖 5 張、會議文件 2 份、背景說明（人名與名詞寫法參考；內容以逐字稿為準）
 
 ## 校正摘要

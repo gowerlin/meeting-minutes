@@ -1,4 +1,4 @@
-# meeting-minutes-pro 2.4.1 第三方元件與授權聲明
+# meeting-minutes-pro 2.5.0 第三方元件與授權聲明
 
 meeting-minutes-pro 本身只包含安裝程式、轉寫腳本與 skill 文件。下列元件都不包含在安裝包內：Python 套件由安裝程式從 PyPI 安裝，模型在安裝時從各自的官方來源下載，FFmpeg 由 winget 或 Homebrew 另行安裝。各元件的授權以其官方來源公布的條款為準，本文件只是摘要。
 
@@ -11,6 +11,7 @@ meeting-minutes-pro 本身只包含安裝程式、轉寫腳本與 skill 文件�
 | NVIDIA cuBLAS／cuDNN（pip 套件） | CUDA 函式庫（只在 Windows 且有 NVIDIA 顯示卡時安裝） | https://pypi.org/project/nvidia-cublas-cu12/ 、https://pypi.org/project/nvidia-cudnn-cu12/ | NVIDIA 授權 |
 | MLX／mlx-whisper | 推論引擎（macOS：Apple GPU） | https://github.com/ml-explore/mlx 、https://github.com/ml-explore/mlx-examples/tree/main/whisper | MIT |
 | optimum-intel | Breeze 轉換成 OpenVINO 格式（只在安裝時暫用） | https://github.com/huggingface/optimum-intel | Apache-2.0 |
+| Transformers、PyTorch（CPU 版）、CTranslate2 轉換工具 | 〔2.5.0〕Breeze-ASR-26 轉換成 CTranslate2 格式、產生 `tokenizer.json`（只在安裝時暫用，裝在暫時環境，轉完刪除） | https://github.com/huggingface/transformers 、https://github.com/pytorch/pytorch 、https://github.com/OpenNMT/CTranslate2 | Apache-2.0、BSD-3-Clause、MIT |
 | sherpa-onnx | 說話者分離；CT-Transformer 標點模型的執行 | https://github.com/k2-fsa/sherpa-onnx | Apache-2.0 |
 | OpenCC（Python 實作） | 簡繁轉換 | https://github.com/BYVoid/OpenCC | Apache-2.0 |
 | pypdf | 〔2.2.0〕讀會議文件（PDF 抽文字；授權全文見下方〈pypdf〉一節） | https://github.com/py-pdf/pypdf | BSD-3-Clause |
@@ -60,9 +61,23 @@ POSSIBILITY OF SUCH DAMAGE.
 |---|---|---|---|
 | Whisper large-v3-turbo（OpenVINO INT8、CTranslate2、MLX 版） | 語音辨識 | https://huggingface.co/OpenVINO/whisper-large-v3-turbo-int8-ov 、https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo 、https://huggingface.co/mlx-community/whisper-large-v3-turbo | MIT |
 | Breeze-ASR-25（原始版、CTranslate2 版、MLX 版；選裝） | 台灣華語／中英夾雜語音辨識 | https://huggingface.co/MediaTek-Research/Breeze-ASR-25 、https://huggingface.co/shdennlin/breeze-asr-25-ct2 、https://huggingface.co/BRlin/Breeze-ASR-25-mlx-fp16 | Apache-2.0 |
+| MediaTek Research Breeze-ASR-26（官方權重；選裝，〔2.5.0〕） | 台語語音辨識（輸出台灣華語文字）；安裝時轉換，見下一節 | https://huggingface.co/MediaTek-Research/Breeze-ASR-26 | Apache-2.0 |
 | pyannote segmentation 3.0（sherpa-onnx 轉換版） | 語音分段 | https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models | MIT |
 | 3D-Speaker ERes2Net（中文聲紋） | 說話者分離 | https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models | Apache-2.0 |
 | CT-Transformer 標點模型 | 本機分段標點 | 見下一節 | FunASR Model Open Source License 1.1 |
+
+## MediaTek Research Breeze-ASR-26（2.5.0 起，選裝；安裝時下載並轉換，不包含在安裝包內）
+
+- 模型名稱：Breeze-ASR-26（MediaTek Research 以 Whisper large-v2 架構訓練的台語語音辨識模型，輸出台灣華語文字）
+- 來源：https://huggingface.co/MediaTek-Research/Breeze-ASR-26 ，固定使用 revision `7b992682e7f5ceedd0a41ebec240f01ba469d19e`
+  （安裝程式下載後比對兩個權重檔的大小與 SHA-256：
+  `model-00001-of-00002.safetensors` `78e177c9a5228eed20f1f33485f8288bda5308a077fa7758281088c2a3100535`、
+  `model-00002-of-00002.safetensors` `9c1f45081c3a2a606a1dc75e02653770956279d2942015587cf4880879952a7e`）
+- 授權：Apache License 2.0（全文：https://www.apache.org/licenses/LICENSE-2.0 ）
+- 本程式的使用方式：只在使用者選裝時，安裝程式下載官方權重，在本機轉換成 CTranslate2（NVIDIA）或 OpenVINO INT8（Intel／CPU）格式，
+  轉換後刪除原始權重；轉換結果只存在使用者電腦（`models/ct2/breeze-asr-26-ct2/` 或 `models/openvino/breeze-asr-26-int8-ov/`），
+  裡面的 `breeze26-source.json` 記錄來源 revision、原始權重雜湊與轉換工具版本。本專案不散布模型權重或轉換結果。
+- 依官方說明，訓練資料全部是合成台語語音（約一萬小時）；輸出是台灣華語文字（台語會翻成華語），不是台語漢字或台羅。
 
 ## CT-Transformer 標點模型（安裝時下載，不包含在安裝包內）
 

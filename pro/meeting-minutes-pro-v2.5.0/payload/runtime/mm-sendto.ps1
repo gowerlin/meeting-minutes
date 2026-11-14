@@ -1,8 +1,10 @@
-﻿# 檔案總管右鍵「傳送到 → 會議轉寫（Pro）」的執行腳本（meeting-minutes-pro 2.4.1）
+﻿# 檔案總管右鍵「傳送到 → 會議轉寫（Pro）」的執行腳本（meeting-minutes-pro 2.5.0）
 # 流程（1.2.0）：先問轉寫要用的資訊 → 轉寫 → 逐字稿完成後依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（按 Enter＝是）
 # 〔1.2.2〕每次詢問（含最後的「按 Enter 關閉」）前先清空鍵盤緩衝（Clear-KeyBuffer）
 # 〔2.0.0〕轉寫前的提問：內容類型（含自訂範本；記住上次，$MMH\state.json）→ 講者人數／s 略過 → 專有名詞 → Breeze（規格 §7.1、§7.2）；
 #         整理的題目與輸出依類型（會議：meeting-minutes.md；其他：notes.md）；結束畫面列字幕、說話者分離退回與零星講者（§7.4）
+# 〔2.5.0〕「使用 Breeze-ASR-25？[y/N]」改成「辨識模型」選擇題，只列出已安裝的（profiles.breeze → b、profiles.breeze26 → t；
+#         y 照舊當成 b）；都沒裝就不問。選 t 時印一行提醒（又略過說話者分離時多一行雜訊提醒）。作答時間記成 ask_whisper（2.4.1 以前叫 ask_breeze；規格 2.5.0 §5）
 # 〔2.0.1〕讀檔的 cmdlet 加 -ErrorAction Stop：Get-Content／Select-String 找不到檔案是「非終止錯誤」，try/catch 抓不到，
 #         會在主控台印紅字（第一次執行時 state.json 還不存在）。現在讀不到、壞掉的 JSON 都安靜地當作沒有
 # 〔2.1.0〕網頁版（規格 2.1.0 §7.1）：不加題目；auto_minutes.py 會接著產生 meeting-minutes.html／notes.html。結束畫面讀
@@ -281,10 +283,30 @@ while ($null -eq $spk) {
 }
 $preWaits += , @("ask_speakers", $tA, $tB)
 $r = Ask "本次專有名詞，逗號分隔（可留空）"; $hot = $r[0]; $preWaits += , @("ask_hotwords", $r[1], $r[2])
-$useBreeze = $false
-if ($cfg -and $cfg.profiles -and $cfg.profiles.breeze) {
-    $r = Ask "使用 Breeze-ASR-25？（中英夾雜很重的技術會議較準，但較慢）[y/N]"; $preWaits += , @("ask_breeze", $r[1], $r[2])
-    $useBreeze = $r[0] -match '^[yY]'
+# 〔2.5.0〕辨識模型：只列出已安裝的 Breeze（規格 2.5.0 §5）
+$whisperArg = $null
+$hasB25 = [bool]($cfg -and $cfg.profiles -and $cfg.profiles.breeze)
+$hasB26 = [bool]($cfg -and $cfg.profiles -and $cfg.profiles.breeze26)
+if ($hasB25 -or $hasB26) {
+    $mOpts = @("Enter＝預設（turbo）")
+    if ($hasB25) { $mOpts += "b＝Breeze-ASR-25（中英夾雜很重的技術會議）" }
+    if ($hasB26) { $mOpts += "t＝Breeze-ASR-26（台語或華台混講，輸出華語文字）" }
+    $mKeys = @(); if ($hasB25) { $mKeys += "b" }; if ($hasB26) { $mKeys += "t" }
+    $mQ = "辨識模型：" + ($mOpts -join "／")
+    $picked = $false; $tA = $null; $tries = 0
+    while (-not $picked) {
+        $r = Ask $mQ; if (-not $tA) { $tA = $r[1] }; $tB = $r[2]; $ans = $r[0].Trim(); $tries++
+        if (-not $ans) { $picked = $true }
+        elseif ($hasB25 -and $ans -match '^[bByY]$') { $whisperArg = "breeze"; $picked = $true }
+        elseif ($hasB26 -and $ans -match '^[tT]$') { $whisperArg = "breeze26"; $picked = $true }
+        elseif ($tries -lt 2) { Write-Host ("請輸入 {0}，或直接按 Enter（turbo）" -f ($mKeys -join "、")) -ForegroundColor Yellow }
+        else { $picked = $true; Write-Host "沒有這個選項，使用預設（turbo）" -ForegroundColor Yellow }
+    }
+    $preWaits += , @("ask_whisper", $tA, $tB)
+    if ($whisperArg -eq "breeze26") {
+        Write-Host "台語會翻成華語文字；人名、機關名、否定句請人工核對" -ForegroundColor Yellow
+        if ($spk -eq "skip") { Write-Host "沒有說話者分離時，長段雜訊或音樂可能被辨識成句子" -ForegroundColor Yellow }   # 規格 2.5.0 §6
+    }
 }
 # 〔2.0.0〕依類型：transcribe.py／auto_minutes.py 的參數、整理的稱呼與輸出檔（規格 §6.2、§7.3）
 if ($sel.template) { $TypeArgs = @("--template", $sel.template) } else { $TypeArgs = @("--type", $sel.type) }
@@ -520,7 +542,7 @@ foreach ($f in $Files) {
     if ($spk -eq "skip") { $argList += "--no-diarize" }
     elseif ($spk -match '^\d+$') { $argList += @("--speakers", $spk) }
     if ($hot) { $argList += @("--hotwords", (Native-Arg $hot)) }   # 〔2.3.0〕同 --context：PowerShell 5.1 遇到 " 與結尾 \ 也原樣傳
-    if ($useBreeze) { $argList += @("--whisper", "breeze") }
+    if ($whisperArg) { $argList += @("--whisper", $whisperArg) }   # 〔2.5.0〕breeze／breeze26
     Write-Host "`n=== $f ===" -ForegroundColor Cyan
     $stdout = @(& $Py @argList)          # 進度寫在 stderr（直接顯示）；stdout 最後一行是 JSON 摘要
     $code = $LASTEXITCODE

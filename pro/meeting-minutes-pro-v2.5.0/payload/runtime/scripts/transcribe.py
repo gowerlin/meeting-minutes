@@ -43,7 +43,9 @@ import numpy as np
 import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import (DEFAULT_WHISPER, LOCAL_ONLY_EXIT, VERSION, config_problem_text, default_glossary,  # noqa: E402
+from common import (BREEZE26_NO_DIAR_NOTE, DEFAULT_WHISPER, LOCAL_ONLY_EXIT, VERSION, asr_vad_filter,  # noqa: E402
+                    config_problem_text,
+                    default_glossary,
                     load_config, local_only_message, local_only_state, local_only_why, print_banner, punct_model,
                     punct_ready, read_config, setting,
                     type_setting, utf8_console, write_local_only_marker)
@@ -209,6 +211,7 @@ def split_long(audio: np.ndarray, s: float, e: float, max_len: float = MAX_WIN) 
 # 不在表上的值（例如 --whisper 直接給 Hugging Face repo）印「Whisper <原值>」。
 ASR_DISPLAY = {
     "breeze": "Breeze-ASR-25",
+    "breeze26": "Breeze-ASR-26（台語）",               # 〔2.5.0〕
     "turbo": "Whisper large-v3-turbo",
     "large-v3": "Whisper large-v3",
     "base": "Whisper base",
@@ -219,17 +222,18 @@ def asr_display_name(model: str) -> str:
     return ASR_DISPLAY.get(model, f"Whisper {model}")
 
 
-def load_asr(backend: str, model: str, device: str, compute_type: str, language, hotwords):
-    """依 config 載入，不做即時偵測；失敗就明確告知重新偵測。"""
+def load_asr(backend: str, model: str, device: str, compute_type: str, language, hotwords, vad_filter: bool = False):
+    """依 config 載入，不做即時偵測；失敗就明確告知重新偵測。〔2.5.0〕vad_filter：呼叫端依 asr_vad_filter() 決定。"""
     import backends
     name = asr_display_name(model)
     t0 = time.time()
     try:
-        b = backends.create(backend, model, device, language, hotwords, compute_type)
+        b = backends.create(backend, model, device, language, hotwords, compute_type, vad_filter=vad_filter)
     except Exception as ex:  # noqa: BLE001
         sys.exit(f"無法以 {backend}/{device} 載入 {name}：{ex}\n"
                  "硬體或驅動可能已變更，請重新執行 install.cmd（或 setup_backend.py）重新偵測。")
-    log(f"  {name} 載入：{backend} / {device}（{time.time() - t0:.1f}s）")
+    vad = "；vad_filter 開：略過非人聲" if vad_filter else ""   # 〔2.5.0〕規格 2.5.0 §6
+    log(f"  {name} 載入：{backend} / {device}（{time.time() - t0:.1f}s{vad}）")
     return b
 
 
@@ -505,7 +509,12 @@ def main():
         log(f"  講者 {'、'.join(minor)} 發言很少，可能是分離誤判（見 transcript.md 表頭）")
 
     log(f"[3/{n_steps}] 語音辨識（{args.backend} / {args.device}）")
-    h_asr = rl.begin("asr", backend=args.backend, device=args.device, asr_model=args.whisper)
+    # 〔2.5.0〕breeze26（ct2）有說話者分離時開 vad_filter；只在開的時候多記一欄（規格 2.5.0 §6）
+    vad_on = asr_vad_filter(args.whisper, args.backend, diarized=speakers_setting != "skip")
+    vad_kw = {"vad_filter": True} if vad_on else {}
+    if args.whisper == "breeze26" and speakers_setting == "skip":
+        warn(f"  [!] {BREEZE26_NO_DIAR_NOTE}")
+    h_asr = rl.begin("asr", backend=args.backend, device=args.device, asr_model=args.whisper, **vad_kw)
     hot = args.hotwords or ""
     if args.hotwords_file and Path(args.hotwords_file).exists():
         hot += " " + " ".join(l.strip() for l in Path(args.hotwords_file).read_text(encoding="utf-8").splitlines()
@@ -532,7 +541,7 @@ def main():
         if w and cc and cc.convert(w) != w:
             protect[cc.convert(w)] = w
     protect.update(TW_PREFER)
-    asr = load_asr(args.backend, args.whisper, args.device, args.compute_type, lang, hot)
+    asr = load_asr(args.backend, args.whisper, args.device, args.compute_type, lang, hot, vad_filter=vad_on)
     dev = f"{args.backend}/{args.device}"
 
     out = []
@@ -603,7 +612,8 @@ def main():
             "elapsed_sec": round(elapsed, 1), "rtf": elapsed / max(duration, 1e-6), "hotwords": hot,
             "corrections_applied": fixed_total, "punctuation": pmeta, "opencc_keep_applied": keep_total,
             # 〔2.0.0〕只新增欄位（規格 §2.1、§4.8）
-            "content_type": ctype, "template": args.template, "diarization": dmeta, "speaker_stats": stats}
+            "content_type": ctype, "template": args.template, "diarization": dmeta, "speaker_stats": stats,
+            **vad_kw}                                               # 〔2.5.0〕breeze26（ct2）才有 vad_filter 欄
     write_outputs(out_dir, meta, out, frames, paras)
     wav.unlink(missing_ok=True)
     rl.end(h, files=["transcript.json", "transcript.md", "transcript.srt"])

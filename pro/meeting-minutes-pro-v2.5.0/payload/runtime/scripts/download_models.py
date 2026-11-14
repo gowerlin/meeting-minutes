@@ -113,9 +113,9 @@ CT2_TOKENIZER_SOURCE = {"turbo": "openai/whisper-large-v3-turbo", "large-v3": "o
 
 
 def ensure_whisper(backend: str, alias: str, compute_type: str = "default"):
-    if alias == "breeze":
+    if alias in ("breeze", "breeze26"):                  # 〔2.5.0〕breeze26：安裝時由官方權重轉換（breeze.py）
         import breeze
-        breeze.ensure(backend, compute_type)
+        breeze.ensure(backend, compute_type, alias)
         return
     d = whisper_dir(backend, alias)
     if not whisper_ready(backend, alias):
@@ -139,8 +139,8 @@ def main():
     utf8_console()
     ap = argparse.ArgumentParser()
     ap.add_argument("--backend", default="openvino", choices=["openvino", "ct2", "mlx"])
-    ap.add_argument("--whisper", default=DEFAULT_WHISPER, help="turbo / large-v3 / base / breeze")
-    ap.add_argument("--compute-type", default="default", help="ct2 + breeze 時決定下載哪個精度")
+    ap.add_argument("--whisper", default=DEFAULT_WHISPER, help="turbo / large-v3 / base / breeze / breeze26")
+    ap.add_argument("--compute-type", default="default", help="ct2 + breeze／breeze26 時決定下載或轉換哪個精度")
     ap.add_argument("--punct-archive", help="離線安裝：本機的標點模型 tar.bz2（同樣驗 SHA-256）")
     ap.add_argument("--punct-only", action="store_true", help="只補標點模型")
     args = ap.parse_args()

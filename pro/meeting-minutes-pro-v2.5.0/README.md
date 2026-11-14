@@ -1,8 +1,8 @@
 # meeting-minutes-pro：本機轉寫的會議記錄 Skill（進階版）
 
-> 版本 2.4.1
+> 版本 2.5.0
 
-把會議錄音或錄影在**自己的電腦上**轉成逐字稿，再讓 AI 整理成繁體中文會議記錄（GPT（OpenAI）或 Claude（Anthropic），兩者都能用時預設 GPT），內容包括摘要、議題、決議、待辦與待釐清問題，每一項都附時間碼。2.0 起也能整理課程、訪談節目、操作教學、座談、工作坊、需求訪談的錄音（共 7 種內容類型，另可自訂範本），並產生校正版字幕；有 NVIDIA 顯示卡時可以選裝 GPU 說話者分離。2.1 起整理完會同時產生**網頁版**（`meeting-minutes.html`／`notes.html`，時間碼點了播放原始錄音）。2.2 起 AI 校正與會議摘要會一起參考**影片截圖、背景說明與會議文件**，補上與會者全名、講者對應與會議日期。2.3 起配合附屬工具**會議記錄校稿**（另外安裝）：校完的定稿逐字稿 `transcript.final.md` 會優先用來整理會議記錄。2.4 起有**本機限定**：機敏會議從另一個右鍵（拖放）入口轉寫，什麼都不送雲端。轉寫用的硬體在安裝時自動選定：Intel NPU／GPU、NVIDIA GPU、Apple Silicon GPU 或 CPU。
+把會議錄音或錄影在**自己的電腦上**轉成逐字稿，再讓 AI 整理成繁體中文會議記錄（GPT（OpenAI）或 Claude（Anthropic），兩者都能用時預設 GPT），內容包括摘要、議題、決議、待辦與待釐清問題，每一項都附時間碼。2.0 起也能整理課程、訪談節目、操作教學、座談、工作坊、需求訪談的錄音（共 7 種內容類型，另可自訂範本），並產生校正版字幕；有 NVIDIA 顯示卡時可以選裝 GPU 說話者分離。2.1 起整理完會同時產生**網頁版**（`meeting-minutes.html`／`notes.html`，時間碼點了播放原始錄音）。2.2 起 AI 校正與會議摘要會一起參考**影片截圖、背景說明與會議文件**，補上與會者全名、講者對應與會議日期。2.3 起配合附屬工具**會議記錄校稿**（另外安裝）：校完的定稿逐字稿 `transcript.final.md` 會優先用來整理會議記錄。2.4 起有**本機限定**：機敏會議從另一個右鍵（拖放）入口轉寫，什麼都不送雲端。2.5 起可以選裝**台語模型 Breeze-ASR-26**：會議有人講台語、華台混講時，台語會翻成華語文字。轉寫用的硬體在安裝時自動選定：Intel NPU／GPU、NVIDIA GPU、Apple Silicon GPU 或 CPU。
 
 - 音檔不上傳。在 Claude 對話（Claude Code、Claude 桌面 App）中讀到的逐字稿與影片截圖會送到 Anthropic 雲端處理；對話中讀檔前沒有另外的送出確認。做選用的[自動校正](#6-自動校正選用)時，逐字稿文字、影片截圖（最多 8 張，縮小後）、背景說明與會議文件的名詞和相關段落會送到你選的 AI（GPT（OpenAI）或 Claude（Anthropic））；做[會議摘要](#7-會議摘要選用120)時送逐字稿文字、背景說明與文件的名詞和段落（摘要不送截圖）。音檔與文件原檔都不上傳（見[參考資料](#14-參考資料220)）。機敏內容用[本機限定](#17-本機限定機敏會議240)：什麼都不送，在 Claude 對話中也會先問你才讀。
 - 支援 **Windows（x64）** 與 **macOS（Apple Silicon）**。
@@ -12,7 +12,7 @@ Pro 版在基本版 `meeting-minutes` 之外，多了十七項功能：
 
 1. **固定錯誤對照表**（`corrections.tsv`）：固定的誤辨識（例如「Kubernetes」總是被辨識成「酷伯內蒂斯」）累積成表，轉寫後自動替換，越用越準。
 2. **校正版逐字稿**（`transcript.corrected.md`）：Claude 標出每一處修改，方便回頭查證。
-3. **Breeze-ASR-25**：中英夾雜很重的技術會議改用這個模型，比 turbo 準。
+3. **Breeze-ASR-25／Breeze-ASR-26**：中英夾雜很重的技術會議改用 Breeze-ASR-25，比 turbo 準；〔2.5〕會議有人講台語、華台混講改用 Breeze-ASR-26（台語會翻成華語文字）。
 4. **本機分段標點**（1.1.0）：轉寫時就在本機依講者、停頓與段長分段，並補上標點。
 5. **OpenCC 詞彙回復表**（1.1.0）：不讓簡繁轉換把「權限」「分區」「帳號」改成「許可權」「分割槽」「賬號」。
 6. **自動校正**（1.1.0，選用）：轉寫完成後自動呼叫 GPT 或 Claude 校正同音錯字與專有名詞，產出校正版逐字稿與對照表建議。
@@ -27,6 +27,13 @@ Pro 版在基本版 `meeting-minutes` 之外，多了十七項功能：
 15. **全文用字統一**（2.2）：同一個名詞在校正版、字幕、會議記錄與筆記裡用同一種寫法（例 `notebooklm`、`notebook lm`、`notebookLM` → `NotebookLM`）；本機處理，不呼叫模型。
 16. **定稿逐字稿**（2.3）：附屬工具「會議記錄校稿」在瀏覽器逐一確認校正版的標記，產生沒有標記的 `transcript.final.md`；會議摘要預設優先用它（`--source final` 只用它），表頭寫「已人工校稿」。
 17. **本機限定**（2.4）：機敏會議從右鍵「會議轉寫（Pro，本機限定）」（macOS：「會議轉寫（Pro，本機限定）.app」）轉寫，或在 `config.json` 開 `privacy.local_only` 讓整部電腦都不送雲端；AI 校正與整理一律拒絕送出，改用會議記錄校稿人工校稿。
+
+**2.5.0 新功能：台語／華台混講選項（Breeze-ASR-26，選裝）**（詳見[Breeze-ASR-26](#31-breeze-asr-26台語華台混講選裝250)）：
+- 會議有人講台語、華台混講（社區、長輩、地方、基層訪談）時，轉寫改用 [Breeze-ASR-26](https://huggingface.co/MediaTek-Research/Breeze-ASR-26)（MediaTek Research，Apache-2.0）。**輸出是華語文字**：台語會翻成台灣華語，不是台語漢字或台羅。
+- 實測真人台語約**三成字錯**（turbo 與 Breeze-ASR-25 是五到八成，多半看不懂）；人名、機關名、否定句容易錯而且讀起來通順，**不適合直接當正式逐字紀錄**，要人工核對。訓練資料全部是合成台語語音（官方說明約一萬小時）。
+- 安裝時問一次（**預設不裝**；`-Breeze26` 直接裝）。要約 10 GB 可用空間：暫時下載官方權重約 6.2 GB、轉換後佔約 1.6 GB。已安裝後加裝：`setup_backend.py --breeze26-only`。
+- 右鍵（拖放）入口原本的「使用 Breeze-ASR-25？」改成「辨識模型」選擇題，只列出已安裝的模型；`t`＝Breeze-ASR-26。命令列：`--whisper breeze26`。Breeze-ASR-25 與 turbo 的行為不變。
+- NVIDIA（CTranslate2）與 Intel／CPU（OpenVINO）都可以用；macOS（Apple Silicon 的 MLX）本版不提供。
 
 **2.4.1 安全修正：config.json 讀不了時也當成本機限定**（詳見[本機限定](#17-本機限定機敏會議240)〈config.json 讀不了或值看不懂〉）：
 - `config.json` 存在但讀不了（沒有權限、被鎖住、不是 UTF-8、不是合法的 JSON、空檔、最外層不是物件），或 `privacy.local_only` 的值看不懂（`"true"`、`1`、`null` 等；`privacy` 不是物件），2.4.0 會當成「不是本機限定」照常送出；2.4.1 起一律**當成本機限定**（不送 GPT 或 Claude），畫面寫明原因、檔案路徑與恢復方法。
@@ -127,6 +134,7 @@ Pro 版有自己的 skill 名稱、runtime 目錄和轉寫入口，**可以和�
 | **錯誤對照表**（Pro） | `corrections.tsv` 在轉寫後自動替換固定錯誤；正確寫法也會自動加入辨識提示 |
 | **校正版逐字稿**（Pro） | `transcript.corrected.md`，以 `{原文→修正}` 標示每處修改，`[?…]` 標示待確認 |
 | **Breeze-ASR-25**（Pro，選裝） | 台灣華語與中英夾雜特化模型，三種後端都支援 |
+| **Breeze-ASR-26**（Pro 2.5，選裝） | 台語、華台混講用：台語會翻成華語文字。NVIDIA 與 Intel／CPU 支援，macOS 不提供 |
 | **本機分段標點**（Pro 1.1.0） | 依講者切換、停頓（預設 2 秒）、段長（預設 200 字）分段；Breeze 一律用 CT-Transformer 補標點，turbo 標點夠密就沿用 Whisper 的。全在本機、不送雲端 |
 | **OpenCC 詞彙回復表**（Pro 1.1.0） | `s2twp` 轉換前先保護台灣也在用的詞（權限、分區、窗口、發布、帳號……），可在 `opencc_keep.tsv` 自行加詞 |
 | **自動校正**（Pro 1.1.0，選用） | 轉寫後由 GPT（`codex` 指令）或 Claude（`claude` 指令）自動校正，產出 `transcript.corrected.md` 與 `corrections.suggested.tsv`；入口每次轉寫完會問（1.2.0），CLI 對話中依安裝時的設定 |
@@ -203,6 +211,30 @@ python corrections.py test "我們的酷伯內蒂斯叢集"                     
 - Breeze 一律跟著主後端走，安裝時會在主裝置上實測。例如 NPU 載入失敗，就改用 CPU，並把結果寫進 `config.json` 的 `profiles.breeze`。**轉寫時不再偵測**。
 - 選用方式：轉寫時加 `--whisper breeze`。本機轉寫入口會詢問是否使用；CLI 模式下，Claude 會依你描述的會議類型判斷，判斷不了會先問你，並附上預估時間。
 - 事後加裝：`setup_backend.py --breeze-only`。
+
+### 3.1 Breeze-ASR-26（台語／華台混講，選裝，2.5.0）
+
+[Breeze-ASR-26](https://huggingface.co/MediaTek-Research/Breeze-ASR-26) 是 MediaTek Research 以 Whisper large-v2 架構訓練的**台語**語音辨識模型（Apache-2.0）。它把台語語音轉成**台灣華語文字**（台語會翻成華語，不是台語漢字或台羅），華語照常轉寫。
+
+- **什麼時候用**：會議有人講台語、華台混講（社區、長輩、地方、基層訪談）。一般華語會議用預設的 turbo；英文術語多的技術會議用 Breeze-ASR-25（Breeze-ASR-26 的英文名詞比 25 差）。
+- **準確度**（2.5.0 開發時實測，素材類型分開看）：真人朗讀的純台語約 31～36% 字錯（turbo 65～79%、Breeze-ASR-25 53～72%）；華語讀者看得懂的句數，真人台語約五成到八成（turbo 與 25 多半看不懂）。合成的華台混講素材只有約 5% 字錯，但**訓練資料全部是合成台語語音（官方說明約一萬小時）**，合成素材的分數偏樂觀，請以真人的三成為準。華語會議與 Breeze-ASR-25 差不多。
+- **限制**：人名、機關名容易錯（例「疾病管制署」寫成同音字），否定句可能被寫成肯定句；這些錯誤讀起來很通順，不容易發現，**不適合直接當正式逐字紀錄**，要人工核對（可用[會議記錄校稿](#16-定稿逐字稿與會議記錄校稿230)）。數字常寫成中文數字（「四千三百六十萬」）。
+- **速度與記憶體**：和 Breeze-ASR-25 同級（NVIDIA 上每小時錄音約 4 分鐘、顯示記憶體約多 2.4～3.4 GB）；Intel／CPU 的 OpenVINO 版較慢（實測 CPU 的 RTF 約 0.2～0.3，一小時錄音約 12～18 分鐘）。
+- **安裝**：官方沒有現成的 CTranslate2／OpenVINO 版，安裝時在你的電腦上轉換：
+
+  | 主後端 | 取得方式 | 需要的空間 |
+  |---|---|---|
+  | faster-whisper（NVIDIA CUDA） | 固定版本（revision）下載官方權重 → 比對 SHA-256 → 暫時環境（Transformers＋PyTorch CPU）轉成 CTranslate2（精度規則同 Breeze-ASR-25）→ 刪除原始權重與暫時環境 | 約 10 GB 可用空間（暫時下載約 6.2 GB），轉換後佔約 1.6 GB；多花約 5～10 分鐘 |
+  | OpenVINO（Intel NPU／GPU／CPU） | 同上，用 optimum-intel 轉成 OpenVINO INT8 | 同上；多花約 5～20 分鐘 |
+  | MLX（Apple GPU） | **本版不提供**（社群 MLX 版未驗證）；macOS 安裝程式不問，入口也不會出現 | — |
+
+  - 安裝程式會問「是否安裝 Breeze-ASR-26（台語或華台混講；暫時下載約 6.2 GB，轉換後佔 1.6 GB）？[y/N]」，**預設不裝**；`install.cmd -Breeze26` 不詢問直接裝，`-NoBreeze26` 不裝。已經裝過的不再問、保留（`-NoBreeze26` 也不會移除）。
+  - 已安裝後加裝：`"%LOCALAPPDATA%\meeting-minutes-pro\venv\Scripts\python.exe" "%LOCALAPPDATA%\meeting-minutes-pro\scripts\setup_backend.py" --breeze26-only`。
+  - 空間不夠、下載或轉換失敗時會寫明原因後停止，暫存檔會刪掉、不會留下轉到一半的模型；完整安裝時其他部分照常完成，之後再用上面的指令加裝。
+  - 結果寫進 `config.json` 的 `profiles.breeze26`（後端、裝置、精度、RTF），`profiles.breeze` 與其他設定都不動。模型放在 `models/ct2/breeze-asr-26-ct2/`（或 `models/openvino/breeze-asr-26-int8-ov/`），和 Breeze-ASR-25 分開，一次只載入一個；裡面的 `breeze26-source.json` 記錄來源版本與原始權重的雜湊。
+  - 移除：`setup_backend.py --remove-breeze26`（刪模型與 `profiles.breeze26`，其他設定不動）。
+- **選用方式**：右鍵（拖放）入口的「辨識模型」題選 `t`（選了會多印一行「台語會翻成華語文字；人名、機關名、否定句請人工核對」）；命令列加 `--whisper breeze26`；CLI 模式下說「會議有人講台語」，Claude 會改用它。語言參數沿用 `zh`。
+- **雜訊**：Breeze-ASR-26 遇到長段雜訊時會編出通順的句子（例「老闆 老闆娘」），原本擋幻覺的過濾擋不住。2.5.0 在**有說話者分離時**對它開啟語音偵測（faster-whisper 的 `vad_filter`，只限 NVIDIA 的 CTranslate2 版）：開發時實測白雜訊被辨識成句子的段數從 2 降到 0，8 種素材的真語音結果逐字相同。**略過說話者分離時不開**（實測會讓真人台語朗讀多約 1 個百分點的字錯），改成在入口選 `t` 又略過說話者分離時多印一行「沒有說話者分離時，長段雜訊或音樂可能被辨識成句子」（命令列 `--no-diarize` 時也印）。有長段音樂、雜訊的錄音請不要略過說話者分離。Intel／CPU（OpenVINO）版沒有對應的做法，照舊不開。turbo 與 Breeze-ASR-25 都不開（行為不變）。
 
 ### 4. 本機分段標點
 
@@ -787,8 +819,8 @@ AI 校正是分段處理的，同一個名詞在各段常寫成不同的大小�
 
 | 檔案 | 給誰 | 怎麼用 |
 |---|---|---|
-| `meeting-minutes-pro-v2.4.1-installer.zip` | 要在自己電腦上安裝（本機轉寫、右鍵／拖放轉寫、Claude CLI）的人 | 完整解壓縮後執行 `install.cmd`（Windows）或 `install.command`（macOS），步驟見下方 |
-| `meeting-minutes-pro-v2.4.1-claude-app-upload.zip` | 只要在 Claude App 上傳 skill 的人 | **不要解開**，直接上傳（見下方[選單](#選單)後的上傳步驟） |
+| `meeting-minutes-pro-v2.5.0-installer.zip` | 要在自己電腦上安裝（本機轉寫、右鍵／拖放轉寫、Claude CLI）的人 | 完整解壓縮後執行 `install.cmd`（Windows）或 `install.command`（macOS），步驟見下方 |
+| `meeting-minutes-pro-v2.5.0-claude-app-upload.zip` | 只要在 Claude App 上傳 skill 的人 | **不要解開**，直接上傳（見下方[選單](#選單)後的上傳步驟） |
 
 > 把安裝包（`-installer.zip`）直接上傳 Claude App 會出現「Zip cannot contain nested zip files」，請改用 `-claude-app-upload.zip`，或安裝後桌面上的 `meeting-minutes-pro-skill-upload.zip`。
 
@@ -818,7 +850,7 @@ App 的 skill 在沙盒中執行，轉寫仍要在本機完成，所以用 Claud
   [4] 解除安裝
 ```
 
-接著會詢問是否安裝 Breeze-ASR-25（預設安裝），以及是否開啟自動校正（預設不開；只在第一次安裝或從 1.0.0 升級時問）：
+接著會詢問是否安裝 Breeze-ASR-25（預設安裝）、〔2.5〕是否安裝 Breeze-ASR-26（台語；預設不裝，已裝過不問），以及是否開啟自動校正（預設不開；只在第一次安裝或從 1.0.0 升級時問）：
 
 ```text
   自動校正（選用）
@@ -857,7 +889,7 @@ flowchart TD
     E4 --> F
     F --> G[寫入 config.json<br/>移除落選後端的模型]
     G --> G2{安裝 Breeze?}
-    G2 -->|是| G3[依主後端下載或轉換<br/>實測裝置，寫入 profiles.breeze]
+    G2 -->|是| G3[依主後端下載或轉換<br/>實測裝置，寫入 profiles.breeze<br/>2.5：選了 Breeze-ASR-26 時另外轉換、寫入 profiles.breeze26]
     G2 -->|否| G4
     G3 --> G4
     G4[補上新版設定鍵（1.2.2：列出補了哪些，沒有就寫「設定鍵無變更」）<br/>寫入自動校正的選擇、建立 opencc_keep.tsv（不存在才建立）<br/>2.0：寫入 GPU 說話者分離的狀態、建立 templates 資料夾] --> H
@@ -879,6 +911,7 @@ install.cmd -Target Both -Backend ct2:cuda -ComputeType int8_float16   # 同時�
 install.cmd -Target Both -Whisper large-v3      # 改用較準確但較慢的模型
 install.cmd -Target Both -KeepAll               # 保留所有後端的模型與套件
 install.cmd -Target Both -Breeze                # 安裝 Breeze-ASR-25，不詢問（-NoBreeze 則不安裝）
+install.cmd -Target Both -Breeze26              # 2.5：安裝 Breeze-ASR-26（台語），不詢問（-NoBreeze26 則不裝；不會移除已裝的）
 install.cmd -Target Both -Correct               # 開啟自動校正，不詢問（-NoCorrect 則關閉）
 install.cmd -Target Both -Correct -CorrectProvider openai              # 指定供應商（auto / claude / openai）
 install.cmd -Target Both -Correct -CorrectModel sonnet                 # 指定模型（供應商由模型名稱判斷）
@@ -898,6 +931,7 @@ macOS：
 ./install.sh --target both --whisper large-v3
 ./install.sh --target both --keep-all
 ./install.sh --target both --breeze             # 安裝 Breeze-ASR-25，不詢問（--no-breeze 則不安裝）
+# 2.5：--breeze26／--no-breeze26 可以給，但 macOS 本版不提供 Breeze-ASR-26（只印說明、略過）
 ./install.sh --target both --correct            # 開啟自動校正，不詢問（--no-correct 則關閉）
 ./install.sh --target both --correct --correct-provider openai --correct-model gpt-6.1-sol
 ./install.sh --target both --correct --correct-provider claude --correct-channel api
@@ -998,7 +1032,7 @@ App 的 skill 在沙盒中執行，用不到你電腦的 NPU 或 GPU，所以轉
 1. 開始轉寫：
    - **Windows**：在檔案總管對錄音或錄影檔按右鍵 →「**傳送到**」→「**會議轉寫（Pro）**」。Windows 11 若沒看到「傳送到」，先點「顯示其他選項」，或按 Shift 加右鍵。
    - **macOS**：把錄音或錄影檔**拖曳到「應用程式」裡的「會議轉寫（Pro）」**圖示上，或在 Finder 按右鍵 →「打開檔案的應用程式」→「會議轉寫（Pro）」。第一次使用時，macOS 會詢問是否允許它控制「終端機」，請按允許。
-2. 選內容類型（直接按 Enter＝會議，之後會記住上次的選擇）、輸入講者人數和本次的專有名詞（都可以留空；人數輸入 `s` 略過說話者分離）；有安裝 Breeze 時，會再問是否使用 Breeze。接著開始轉寫。
+2. 選內容類型（直接按 Enter＝會議，之後會記住上次的選擇）、輸入講者人數和本次的專有名詞（都可以留空；人數輸入 `s` 略過說話者分離）；有安裝 Breeze 時，會再問「辨識模型」（2.5 起：Enter＝turbo、`b`＝Breeze-ASR-25、`t`＝Breeze-ASR-26，只列出已安裝的）。接著開始轉寫。
 3. **逐字稿完成後**（1.2.0）依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（直接按 Enter＝是；每題寫明逐字稿會送到 GPT（OpenAI）或 Claude（Anthropic），並附這次的預估時間與費用），各自再選這次用哪個模型。結束畫面列出產出的檔案與 log 位置，輸出資料夾會自動打開。流程細節見下方〈入口流程（1.2.0）〉。
 4. 有 `meeting-minutes.md`（選了會議摘要）時，先打開確認決議與待辦（2.1 起可以用瀏覽器打開 `meeting-minutes.html`，時間碼點了直接回聽）；要補講者姓名或修改，在 Claude App 附上 `meeting-minutes.md` 與 `transcript.corrected.md`（沒有就附 `transcript.md`），說「**用 meeting-minutes-pro 檢查這份會議記錄**」。沒有選會議摘要時，附上 `transcript.md`（有自動校正時附 `transcript.corrected.md`；影片可以一併附上 `frames` 裡的截圖），說「**用 meeting-minutes-pro 整理成會議記錄，並產生校正版逐字稿**」。Claude 建議加入對照表的項目會以 TSV 給你，請貼到 `corrections.tsv`。找不到 `claude`／`codex` 指令時，兩題都不問，結束訊息會寫怎麼安裝、登入，以及照 1.0.0 的方式附 `transcript.md` 即可。
 
@@ -1020,7 +1054,7 @@ sequenceDiagram
 
 右鍵「傳送到」與 macOS 拖放入口的完整流程：
 
-1. 轉寫前：〔2.0〕內容類型（含自訂範本）、講者人數（輸入 `s`＝略過說話者分離）、本次專有名詞、（有 Breeze 時）是否用 Breeze。
+1. 轉寫前：〔2.0〕內容類型（含自訂範本）、講者人數（輸入 `s`＝略過說話者分離）、本次專有名詞、（有安裝 Breeze 時）〔2.5〕辨識模型：`辨識模型：Enter＝預設（turbo）／b＝Breeze-ASR-25（中英夾雜很重的技術會議）／t＝Breeze-ASR-26（台語或華台混講，輸出華語文字）`，只列出已安裝的（2.4 的「使用 Breeze-ASR-25？[y/N]」改成這一題，`y` 照舊＝`b`）；作答時間記在 `run_log` 的 `ask_whisper`（2.4 叫 `ask_breeze`）。
 2. 轉寫（不再在轉寫前問自動校正）。
 3. 逐字稿完成後，依序：
    - ① `AI 校正：GPT gpt-6.1-sol（產出 transcript.corrected.md，原稿不改）：約 9 分鐘、API 等價約 US$0.46～0.60（截圖整理另約 15～30 秒）；逐字稿文字、截圖 5 張、會議文件 2 份的名詞與段落會送到 GPT（OpenAI）` → 「要做 AI 校正嗎？[Y/n]」→〔2.2〕背景說明一行（沒有說明檔時；Enter 跳過）→ 選模型
@@ -1170,7 +1204,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `--speakers N` | 講者人數（實際人數）。2.0 起＝保留發言最多的 N 位（見[說話者分離與講者人數](#12-說話者分離與講者人數20)）；不確定就不要給 |
 | `--diarize-engine auto\|sherpa\|pyannote` | 〔2.0〕本次的說話者分離引擎（`pyannote` 要先裝 GPU 套件） |
 | `--backend` / `--device` | 手動覆寫 config（僅供測試；正常使用不需要） |
-| `--whisper turbo\|breeze\|large-v3` | 選擇模型。breeze 要在安裝時選裝；large-v3 要先用 `download_models.py --backend <後端> --whisper large-v3` 下載 |
+| `--whisper turbo\|breeze\|breeze26\|large-v3` | 選擇模型。breeze 要在安裝時選裝；〔2.5〕breeze26（台語，輸出華語文字）要選裝或用 `setup_backend.py --breeze26-only` 加裝；large-v3 要先用 `download_models.py --backend <後端> --whisper large-v3` 下載 |
 | `--no-corrections` | 這次不套用 corrections.tsv |
 | `--hotwords "a, b"` | 本次專有名詞 |
 | `--language zh\|en\|auto` | 語言，預設 zh（中英夾雜也用 zh） |
@@ -1311,7 +1345,7 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | 純華語、收音清楚 | 錯誤率大約一成以內，可以直接閱讀 |
 | 中英夾雜的技術討論 | Whisper 的弱點，錯誤率明顯上升。靠 glossary 和 Claude 校正補強 |
 | 遠距收音、多人搶話 | 錯誤率上升，講者分離也容易混淆 |
-| 台語 | 不支援，辨識結果不可靠 |
+| 台語、華台混講 | turbo 與 Breeze-ASR-25 不可靠；〔2.5〕改用 Breeze-ASR-26：輸出華語文字，真人台語約三成字錯，人名、機關名、否定句要人工核對 |
 
 另外要注意以下幾點：
 
@@ -1331,6 +1365,8 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | 〔2.4〕AI 校正或會議摘要印「本機限定（…）：…已拒絕，沒有送出任何資料」（exit 6、`reason: local_only`） | 這一份或這部電腦是本機限定，照設計不送出。要用 AI：刪除輸出資料夾的 `local-only.json`（這一份）或把 `config.json` 的 `privacy.local_only` 改回 `false`（全部）。見[本機限定](#17-本機限定機敏會議240) |
 | Breeze 在 OpenVINO 轉換失敗 | 查看 `install.log`。常見原因是連不到 `huggingface.co`／`pypi.org`，或磁碟空間不足（轉換過程暫用約 5 GB）。之後可用 `setup_backend.py --breeze-only` 重試 |
 | `--whisper breeze` 顯示缺少模型 | 安裝時沒有選裝 Breeze，或主後端換過了。執行 `setup_backend.py --breeze-only` |
+| 〔2.5〕`--whisper breeze26` 顯示「沒有安裝 Breeze-ASR-26」 | 安裝時沒有選裝，或主後端換過了。執行 `setup_backend.py --breeze26-only`；macOS 顯示「本版不提供 mlx 後端的 Breeze-ASR-26」是正常的 |
+| 〔2.5〕安裝 Breeze-ASR-26 時「磁碟空間不足」 | 安裝 runtime 的那顆磁碟要有約 10 GB 可用空間（暫時下載約 6.2 GB，轉換後只留約 1.6 GB）；清出空間後執行 `setup_backend.py --breeze26-only`。下載或轉換失敗也一樣重試；暫存檔已自動刪除 |
 | 對照表替換錯了 | `corrections.py remove "錯誤寫法"`；本次結果可以從 `transcript.json` 的 `raw` 欄位查原文，或加 `--no-corrections` 重新轉寫 |
 | 候選組合裡沒有 NPU | 確認工作管理員看得到 NPU，更新 Intel NPU 驅動後重新執行 `install.cmd` |
 | 候選組合裡沒有 NVIDIA | 確認 `nvidia-smi` 可執行、驅動支援 CUDA 12，且顯示記憶體至少 3GB |
@@ -1410,7 +1446,9 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 | [MLX](https://github.com/ml-explore/mlx) / [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) | 推論引擎（macOS：Apple GPU） | MIT |
 | Whisper large-v3-turbo（[OpenVINO INT8](https://huggingface.co/OpenVINO/whisper-large-v3-turbo-int8-ov)、[CTranslate2](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo)、[MLX](https://huggingface.co/mlx-community/whisper-large-v3-turbo)） | 語音辨識 | MIT |
 | [Breeze-ASR-25](https://huggingface.co/MediaTek-Research/Breeze-ASR-25)（[CTranslate2 版](https://huggingface.co/shdennlin/breeze-asr-25-ct2)、[MLX 版](https://huggingface.co/BRlin/Breeze-ASR-25-mlx-fp16)） | 台灣華語／中英夾雜語音辨識（選裝） | Apache-2.0 |
+| [Breeze-ASR-26](https://huggingface.co/MediaTek-Research/Breeze-ASR-26)（官方權重，revision `7b992682e7f5ceedd0a41ebec240f01ba469d19e`；〔2.5〕） | 台語語音辨識，輸出台灣華語文字（選裝；安裝時轉換、刪除原始權重） | Apache-2.0 |
 | [optimum-intel](https://github.com/huggingface/optimum-intel) | Breeze 轉換 OpenVINO（只在安裝時暫用） | Apache-2.0 |
+| [Transformers](https://github.com/huggingface/transformers)、[PyTorch](https://github.com/pytorch/pytorch)（CPU 版）、[CTranslate2](https://github.com/OpenNMT/CTranslate2) 轉換工具 | 〔2.5〕Breeze-ASR-26 轉換成 CTranslate2（只在安裝時暫用） | Apache-2.0、BSD-3-Clause、MIT |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | 說話者分離 | Apache-2.0 |
 | pyannote segmentation 3.0 | 語音分段 | MIT |
 | 3D-Speaker ERes2Net | 中文聲紋 | Apache-2.0 |
@@ -1495,6 +1533,12 @@ Windows 上新加裝 NVIDIA 顯示卡時，請執行 `install.cmd`，因為要�
 
 1. 安裝後 `~/Applications` 有兩個 app：`會議轉寫（Pro）.app`、`會議轉寫（Pro，本機限定）.app`；`./install.sh --uninstall` 兩個都移除。
 2. 把錄音檔拖到「會議轉寫（Pro，本機限定）.app」：終端機標題與第一行是「會議轉寫（Pro，本機限定）」，轉寫完不問 AI 校正與整理，輸出資料夾有 `local-only.json`。
+
+### macOS：2.5.0 不提供 Breeze-ASR-26
+
+Apple Silicon 的 MLX 社群版未驗證，本版 macOS 不提供 Breeze-ASR-26：`install.sh` 不詢問（給了 `--breeze26` 只印說明、略過），
+拖放入口的「辨識模型」題也不會出現 `t`。入口改成選擇題的部分（只裝 Breeze-ASR-25 時 `b`／`y`／Enter）只在 Windows 的 Git Bash
+以假 runtime 實測（`tests/entry_harness.py` 的 `whisper_*` 情境）。
 
 ### 開發者測試（不影響正式安裝）
 

@@ -3,13 +3,18 @@
 轉寫時不再偵測；換硬體、更新驅動後，重新執行 install.cmd（或本程式）即可。
 
 Usage:
-  python setup_backend.py [--whisper turbo] [--seconds 60] [--keep-all] [--breeze]
+  python setup_backend.py [--whisper turbo] [--seconds 60] [--keep-all] [--breeze] [--breeze26]
   python setup_backend.py --force openvino:CPU     # 不測速，直接指定（保留 config.json 既有的 bench、detected_at）
   python setup_backend.py --force ct2:cuda [--compute-type int8_float16]
                                                    # 〔1.2.1〕不指定精度時，後端與裝置和既有設定相同就沿用既有 compute_type
   python setup_backend.py --breeze-only            # 已安裝後再加裝 Breeze-ASR-25（沿用既有選定的後端）
+  python setup_backend.py --breeze26-only          # 〔2.5.0〕已安裝後再加裝 Breeze-ASR-26（台語；沿用既有選定的後端）
+  python setup_backend.py --remove-breeze26        # 〔2.5.0〕移除 Breeze-ASR-26 的模型與 profiles.breeze26（其他設定不動）
   python setup_backend.py --punct-only             # 只補裝 CT-Transformer 標點模型（下載失敗後補裝用）
 
+〔2.5.0〕Breeze-ASR-26（規格 2.5.0 §3、§4）：ct2 與 openvino 安裝時由官方權重轉換，mlx 不提供（略過、不寫 profile）。
+  安裝程式的 --breeze26 失敗時只印原因、不中止整個安裝（主模型已寫好；最後一行 JSON 的 breeze26_error），
+  --breeze26-only 失敗則 exit 1。成功時只在 config.json 的 profiles 新增或更新 breeze26，profiles.breeze 與其他鍵不動。
 〔2.4.1〕config.json 存在但讀不了（common.read_config() 的 unreadable）：除了 --punct-only（不寫 config）以外，
 一開始就印原因與路徑、exit 5，不下載、不實測、不寫入（規格 2.4.1 §3）。save_config() 本身也會丟 ConfigUnreadable。
 """
@@ -25,7 +30,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (BACKENDS, CONFIG_UNREADABLE_EXIT, DEFAULT_WHISPER, config_write_refused_message,  # noqa: E402
-                    load_config, print_banner, read_config, sample_wav, save_config, utf8_console)
+                    load_config, model_supported, print_banner, read_config, sample_wav, save_config, utf8_console,
+                    whisper_dir)
 
 OFFLOAD_PREFERENCE = 1.25   # NPU／Apple GPU 在最快者 1.25 倍時間內就優先選（省電、不佔 CPU）
 OFFLOAD = [("openvino", "NPU"), ("mlx", "gpu")]
@@ -228,6 +234,60 @@ def setup_breeze(seconds: int = 30):
     sys.exit("Breeze-ASR-25 在可用裝置上都無法執行")
 
 
+# ---------------------------------------------------------------- 〔2.5.0〕Breeze-ASR-26
+class Breeze26Skip(Exception):
+    """Breeze-ASR-26 沒有裝成（訊息給使用者看）；reason：unsupported｜failed。"""
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
+
+
+def setup_breeze26(seconds: int = 30) -> dict:
+    """準備 Breeze-ASR-26 並實測、寫入 profiles.breeze26（只新增或更新這一個鍵）。失敗丟 Breeze26Skip。"""
+    import download_models as dl
+    cfg = load_config()
+    if not cfg.get("backend"):
+        raise Breeze26Skip("failed", "尚未完成主模型偵測，請先執行完整安裝")
+    be, dev, ct = cfg["backend"], cfg["device"], cfg.get("compute_type", "default")
+    log(f"\n[Breeze-ASR-26] 主後端：{be} / {dev} / {ct}")
+    if not model_supported(be, "breeze26"):
+        raise Breeze26Skip("unsupported", f"本版不提供 {be} 後端的 Breeze-ASR-26（只提供 ct2 與 openvino）")
+    try:
+        dl.ensure_whisper(be, "breeze26", ct)
+    except Exception as ex:  # noqa: BLE001  磁碟空間、下載、雜湊、轉換：breeze.py 已刪掉暫存、沒有留下半成品
+        raise Breeze26Skip("failed", str(ex)[:400]) from None
+    audio, sr = load_sample(seconds)
+    turbo_rtf = next((r["rtf"] for r in cfg.get("bench", []) if r.get("ok") and r["backend"] == be
+                      and r["device"] == dev and r.get("rtf")), None)
+    for d, c in breeze_tries(be, dev, ct):
+        try:
+            r = bench_one(be, d, c, audio, sr, "breeze26")
+            if len(r["text"]) < 10:
+                raise RuntimeError("輸出幾乎沒有文字")
+            prof = {"backend": be, "device": d, "compute_type": c, "rtf": round(r["rtf"], 4)}
+            profiles = dict(load_config().get("profiles", {}), breeze26=prof)   # 重新讀：--breeze 剛寫過 profiles.breeze
+            save_config(profiles=profiles)
+            slower = f"，約為 turbo 的 {r['rtf'] / turbo_rtf:.1f} 倍時間" if turbo_rtf else ""
+            log(f"  [選定] Breeze-26：{be} / {d} / {c}（RTF {r['rtf']:.3f}{slower}）  {r['text'][:24]}")
+            return prof
+        except Exception as ex:  # noqa: BLE001
+            log(f"  [!] Breeze-26 在 {be}/{d} 失敗：{str(ex)[:100]}")
+    raise Breeze26Skip("failed", "Breeze-ASR-26 在可用裝置上都無法執行")
+
+
+def remove_breeze26() -> dict:
+    """移除 Breeze-ASR-26：各後端的模型目錄＋profiles.breeze26；其他鍵與 profiles.breeze 不動。"""
+    import breeze
+    removed = [be for be in BACKENDS if whisper_dir(be, "breeze26").exists() and breeze.remove_26(be)]
+    cfg = load_config()
+    had = "breeze26" in cfg.get("profiles", {})
+    if had:
+        save_config(profiles={k: v for k, v in cfg["profiles"].items() if k != "breeze26"})
+    log(f"[OK] 已移除 Breeze-ASR-26：模型 {('、'.join(removed) or '無')}；profiles.breeze26 {'已刪除' if had else '原本就沒有'}")
+    return {"removed_models": removed, "removed_profile": had}
+
+
 def detection_fields(results: list, forced: bool, old_cfg: dict) -> dict:
     """要寫進 config.json 的 bench、detected_at。
 
@@ -267,6 +327,10 @@ def main():
                     help="搭配 --force 使用，例：int8_float16、float16、int8_float32；不指定時，後端與裝置和既有設定相同就沿用既有精度（1.2.1）")
     ap.add_argument("--breeze", action="store_true", help="主模型選定後，再為同一後端準備 Breeze-ASR-25")
     ap.add_argument("--breeze-only", action="store_true", help="只加裝 Breeze-ASR-25，沿用 config 既有的後端")
+    ap.add_argument("--breeze26", action="store_true",
+                    help="〔2.5.0〕主模型選定後，再為同一後端準備 Breeze-ASR-26（台語；暫時下載約 6.2 GB）")
+    ap.add_argument("--breeze26-only", action="store_true", help="〔2.5.0〕只加裝 Breeze-ASR-26，沿用 config 既有的後端")
+    ap.add_argument("--remove-breeze26", action="store_true", help="〔2.5.0〕移除 Breeze-ASR-26 的模型與 profiles.breeze26")
     ap.add_argument("--punct-only", action="store_true", help="只補裝 CT-Transformer 標點模型")
     ap.add_argument("--punct-archive", help="離線安裝：本機的標點模型 tar.bz2（同樣驗 SHA-256）")
     args = ap.parse_args()
@@ -282,6 +346,18 @@ def main():
     if args.breeze_only:
         prof = setup_breeze()
         print(json.dumps({"breeze": prof}, ensure_ascii=False))
+        return
+    if args.remove_breeze26:                             # 〔2.5.0〕
+        print(json.dumps(remove_breeze26(), ensure_ascii=False))
+        return
+    if args.breeze26_only:                               # 〔2.5.0〕
+        try:
+            prof = setup_breeze26()
+        except Breeze26Skip as ex:
+            log(f"\n[錯誤] Breeze-ASR-26 沒有安裝：{ex}")
+            print(json.dumps({"breeze26": None, "breeze26_error": str(ex), "reason": ex.reason}, ensure_ascii=False))
+            sys.exit(1)
+        print(json.dumps({"breeze26": prof}, ensure_ascii=False))
         return
 
     import download_models as dl
@@ -359,8 +435,16 @@ def main():
             if be not in used:
                 dl.remove_backend_models(be)
     breeze = setup_breeze() if args.breeze else None
+    breeze26, breeze26_error = None, None
+    if args.breeze26:                                    # 〔2.5.0〕失敗只警告，不中止安裝（主模型已寫好）
+        try:
+            breeze26 = setup_breeze26()
+        except Breeze26Skip as ex:
+            breeze26_error = str(ex)
+            log(f"  [!] Breeze-ASR-26 沒有安裝：{ex}")
     # 最後一行給 install.ps1 解析
     print(json.dumps({"backend": best["backend"], "device": best["device"], "breeze": breeze,
+                      "breeze26": breeze26, "breeze26_error": breeze26_error,
                       "compute_type": best.get("compute_type", "default"), "punct": punct_ok,
                       "prune_ct2_packages": (not args.keep_all) and best["backend"] != "ct2" and sys.platform == "win32"}, ensure_ascii=False))
 

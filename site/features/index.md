@@ -22,6 +22,7 @@ description: meeting-minutes-pro 的功能一覽：本機轉寫、本機限定�
 | [固定錯誤對照表](/features/accuracy#固定錯誤對照表) | 總是聽錯的詞記成一張表，之後轉寫自動替換，越用越準 |
 | [專有名詞清單](/features/accuracy#專有名詞清單) | 事先告訴辨識模型會出現哪些人名、產品名，提高辨識正確率 |
 | [Breeze-ASR-25](/features/accuracy#breeze-asr-25)（選裝） | 對台灣華語與中英夾雜特別準的辨識模型，速度較慢 |
+| [Breeze-ASR-26](/features/accuracy#breeze-asr-26-台語)（選裝，2.5） | 會議有人講台語、華台混講時用：台語會翻成華語文字（要人工核對）；macOS 不提供 |
 | [字幕](/features/subtitles) | 依字幕規則重新切條的 `.srt` 字幕，可以搭配影片回放 |
 
 ## 轉寫完成後，選用的 AI 步驟
@@ -61,4 +62,4 @@ description: meeting-minutes-pro 的功能一覽：本機轉寫、本機限定�
 
 ## 和基本版相比
 
-Pro 版多了：本機限定（機敏會議）、固定錯誤對照表、校正版逐字稿、Breeze-ASR-25、本機分段標點、OpenCC 詞彙回復表、自動 AI 校正、自動會議摘要、執行 log、7 種內容類型、自訂範本、字幕、網頁版、參考資料、全文用字統一、說話者分離改進（含 GPU 選項）。差異表見[基本版](/basic#和-pro-版的差異)。
+Pro 版多了：本機限定（機敏會議）、固定錯誤對照表、校正版逐字稿、Breeze-ASR-25、台語用的 Breeze-ASR-26、本機分段標點、OpenCC 詞彙回復表、自動 AI 校正、自動會議摘要、執行 log、7 種內容類型、自訂範本、字幕、網頁版、參考資料、全文用字統一、說話者分離改進（含 GPU 選項）。差異表見[基本版](/basic#和-pro-版的差異)。

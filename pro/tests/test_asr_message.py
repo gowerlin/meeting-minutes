@@ -27,7 +27,8 @@ class FakeBackends(types.ModuleType):
         self.fail = fail
         self.calls = []
 
-    def create(self, backend, model, device, language=None, hotwords=None, compute_type="default"):
+    def create(self, backend, model, device, language=None, hotwords=None, compute_type="default", vad_filter=None):
+        # 〔2.5.0〕load_asr() 多傳 vad_filter（規格 2.5.0 §6）；舊版不傳，預設 None
         self.calls.append((backend, model, device, compute_type))
         if self.fail is not None:
             raise self.fail

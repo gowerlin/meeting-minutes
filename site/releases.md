@@ -13,6 +13,18 @@ description: meeting-minutes-pro 1.0.0 到最新版、基本版 meeting-minutes�
 
 ## meeting-minutes-pro（Pro 版）
 
+### 2.5.0
+
+2026-11-15 發布。新增**台語／華台混講選項**：會議有人講台語時，可以改用 Breeze-ASR-26 轉寫（選裝）。不用台語的人不受影響（預設模型、Breeze-ASR-25 的行為都不變）。
+
+- **Breeze-ASR-26（選裝）**：[MediaTek Research](https://huggingface.co/MediaTek-Research/Breeze-ASR-26) 的台語語音辨識模型（Apache-2.0）。台語會翻成**台灣華語文字**（不是台語漢字或台羅），華語照常轉寫。適合社區、長輩、地方、基層訪談這類有人講台語、華台混講的會議（見[提升準確度 › Breeze-ASR-26](/features/accuracy#breeze-asr-26-台語)）。
+- **準確度與限制**：開發時實測真人台語約三成字錯（預設模型與 Breeze-ASR-25 是五到八成，多半看不懂）。人名、機關名容易寫成同音字，否定句可能被寫成肯定句，讀起來卻很通順；**不適合直接當正式逐字紀錄**，請人工核對（可用[會議記錄校稿](/features/proofread)）。訓練資料全部是合成台語語音（官方說明約一萬小時），合成素材的分數偏樂觀。華語會議與 Breeze-ASR-25 差不多，英文術語多的技術會議仍建議用 Breeze-ASR-25。
+- **雜訊處置**：Breeze-ASR-26 遇到長段雜訊會編出通順的句子；有說話者分離時自動開啟語音偵測略過非人聲（只限 NVIDIA 版；實測雜訊輸出歸零、真語音結果不變）。略過說話者分離時不開，入口與命令列會多印一行提醒，錄音有長段音樂或雜訊時請不要略過說話者分離（見[常見問題](/faq#雜訊或音樂被辨識成句子)）。
+- **安裝**：安裝程式多問一題「是否安裝 Breeze-ASR-26」，**預設不裝**（已經裝過的不再問、保留）。要約 **10 GB** 可用空間：暫時下載官方權重約 6.2 GB，在你的電腦上轉換後只留約 1.6 GB。空間不夠、下載或轉換失敗時畫面寫原因，其他部分照常裝完，之後用 `setup_backend.py --breeze26-only` 加裝；`--remove-breeze26` 移除。NVIDIA（CTranslate2）與 Intel／CPU（OpenVINO）都可以用；**macOS 不提供**（Apple Silicon 的 MLX 版未驗證）。
+- **入口**：右鍵（拖放）轉寫原本的「使用 Breeze-ASR-25？」改成「辨識模型」選擇題，只列出已安裝的模型：Enter＝預設、`b`＝Breeze-ASR-25、`t`＝Breeze-ASR-26（`y` 照舊＝Breeze-ASR-25）。選 `t` 會多印一行提醒。命令列：`--whisper breeze26`；Claude CLI 模式說「會議有人講台語」。
+- **升級**：重新執行新版的安裝程式（`config.json` 只更新版號；選裝時另外多一個 `profiles.breeze26`）。用 Claude 桌面 App 的人請改上傳新版的上傳檔。會議記錄校稿不用改（1.1.2 照常可用）。
+- **已知限制**：macOS 沒有實機驗證（本版 macOS 也不提供 Breeze-ASR-26）；台語的準確度只用朗讀、廣播與合成素材實測，真實台語會議的表現還沒驗證。
+
 ### 2.4.1
 
 2026-11-08 發布。**安全修正**，建議所有 2.4.0 的使用者升級（重新執行安裝程式即可，`config.json` 只更新版號）。

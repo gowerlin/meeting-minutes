@@ -1,9 +1,12 @@
 #!/bin/bash
-# macOS：拖放到「會議轉寫（Pro）.app」或以它開啟檔案時，在「終端機」中執行的轉寫腳本（meeting-minutes-pro 2.4.1）
+# macOS：拖放到「會議轉寫（Pro）.app」或以它開啟檔案時，在「終端機」中執行的轉寫腳本（meeting-minutes-pro 2.5.0）
 # 流程（1.2.0）：先問轉寫要用的資訊 → 轉寫 → 逐字稿完成後依序問「要做 AI 校正嗎？」「要產生會議摘要嗎？」（按 Enter＝是）
 # 〔1.2.2〕每次詢問（含最後的「按 Enter 關閉」）前先清空鍵盤緩衝（flush_input）
 # 〔2.0.0〕轉寫前的提問：內容類型（含自訂範本；記住上次，$MMH/state.json）→ 講者人數／s 略過 → 專有名詞 → Breeze（規格 §7.1、§7.2）；
 #         整理的題目與輸出依類型（會議：meeting-minutes.md；其他：notes.md）；結束畫面列字幕、說話者分離退回與零星講者（§7.4）
+# 〔2.5.0〕「使用 Breeze-ASR-25？[y/N]」改成「辨識模型」選擇題，只列出已安裝的（profiles.breeze → b、profiles.breeze26 → t；
+#         y 照舊當成 b）；都沒裝就不問。選 t 時印一行提醒（又略過說話者分離時多一行雜訊提醒）。作答時間記成 ask_whisper（2.4.1 以前叫 ask_breeze；規格 2.5.0 §5）。
+#         macOS 本版不提供 Breeze-ASR-26（安裝程式不裝，所以 t 不會出現）
 # 〔2.1.0〕網頁版（規格 2.1.0 §7.1）：不加題目；auto_minutes.py 會接著產生 meeting-minutes.html／notes.html。結束畫面讀
 #         auto_minutes.json 的 html：產生成功才列 .html（括號依 media：found／explicit「時間碼可點播放」，其他「時間碼為文字」），
 #         「下一步」改成打開 .html；網頁版失敗時多一行說明（原因與 render_html.py 補做的指令）
@@ -247,10 +250,37 @@ while [ "$SPK" = "-" ]; do
 done
 PRE_WAITS+=("ask_speakers|$T_A|$T_B")
 ask "本次專有名詞，逗號分隔（可留空）："; HOT="$ASK_ANS"; PRE_WAITS+=("ask_hotwords|$ASK_T0|$ASK_T1")
-USE_BREEZE=""
-if "$PY" -c 'import json,sys; c=json.load(open(sys.argv[1], encoding="utf-8")); sys.exit(0 if c.get("profiles", {}).get("breeze") else 1)' "$MMH/config.json" 2>/dev/null; then
-    ask "使用 Breeze-ASR-25？（中英夾雜很重的技術會議較準，但較慢）[y/N] "; PRE_WAITS+=("ask_breeze|$ASK_T0|$ASK_T1")
-    case "$ASK_ANS" in [yY]*) USE_BREEZE=1 ;; esac
+# 〔2.5.0〕辨識模型：只列出已安裝的 Breeze（規格 2.5.0 §5）
+WHISPER_ARG=""
+B_HAS="$("$PY" -c 'import json,sys
+try:
+    p = json.load(open(sys.argv[1], encoding="utf-8")).get("profiles") or {}
+    print(("b" if p.get("breeze") else "") + ("t" if p.get("breeze26") else ""))
+except Exception:
+    print("")' "$MMH/config.json" 2>/dev/null)"
+if [ -n "$B_HAS" ]; then
+    M_Q="辨識模型：Enter＝預設（turbo）"; M_KEYS=""
+    case "$B_HAS" in *b*) M_Q="$M_Q／b＝Breeze-ASR-25（中英夾雜很重的技術會議）"; M_KEYS="b" ;; esac
+    case "$B_HAS" in *t*) M_Q="$M_Q／t＝Breeze-ASR-26（台語或華台混講，輸出華語文字）"; M_KEYS="${M_KEYS:+$M_KEYS、}t" ;; esac
+    picked=""; T_A=""; tries=0
+    while [ -z "$picked" ]; do
+        ask "$M_Q "; [ -z "$T_A" ] && T_A="$ASK_T0"; T_B="$ASK_T1"; tries=$((tries + 1))
+        a="$(printf '%s' "$ASK_ANS" | tr -d ' ')"
+        case "$a" in
+            '') picked=1 ;;
+            b|B|y|Y) case "$B_HAS" in *b*) WHISPER_ARG=breeze; picked=1 ;; esac ;;
+            t|T) case "$B_HAS" in *t*) WHISPER_ARG=breeze26; picked=1 ;; esac ;;
+        esac
+        if [ -z "$picked" ]; then
+            if [ "$tries" -lt 2 ]; then echo "請輸入 $M_KEYS，或直接按 Enter（turbo）"
+            else picked=1; echo "沒有這個選項，使用預設（turbo）"; fi
+        fi
+    done
+    PRE_WAITS+=("ask_whisper|$T_A|$T_B")
+    if [ "$WHISPER_ARG" = "breeze26" ]; then
+        echo "台語會翻成華語文字；人名、機關名、否定句請人工核對"
+        if [ "$SPK" = "skip" ]; then echo "沒有說話者分離時，長段雜訊或音樂可能被辨識成句子"; fi   # 規格 2.5.0 §6
+    fi
 fi
 # 〔2.0.0〕依類型：transcribe.py／auto_minutes.py 的參數、整理的稱呼與輸出檔（規格 §6.2、§7.3）
 if [ -n "$SEL_TPL" ]; then TYPE_ARGS=(--template "$SEL_TPL"); else TYPE_ARGS=(--type "$SEL_TYPE"); fi
@@ -516,7 +546,7 @@ for f in "$@"; do
     if [ "$SPK" = "skip" ]; then args+=(--no-diarize)
     elif [[ "$SPK" =~ ^[0-9]+$ ]]; then args+=(--speakers "$SPK"); fi
     if [ -n "$HOT" ]; then args+=(--hotwords "$HOT"); fi
-    if [ -n "$USE_BREEZE" ]; then args+=(--whisper breeze); fi
+    if [ -n "$WHISPER_ARG" ]; then args+=(--whisper "$WHISPER_ARG"); fi   # 〔2.5.0〕breeze／breeze26
     echo; echo "=== $f ==="
     # 進度寫在 stderr（直接顯示）；stdout 最後一行是 JSON 摘要
     ok=1

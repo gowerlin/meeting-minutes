@@ -21,7 +21,7 @@ macOS 的路徑寫法例如 `~/Documents/會議/0912.m4a`。
 
 Claude 會依序：
 
-1. 在你的電腦上轉寫（技術會議會建議改用 Breeze）。
+1. 在你的電腦上轉寫（技術會議會建議改用 Breeze-ASR-25；說會議有人講台語時改用 Breeze-ASR-26，2.5 起）。
 2. 讀逐字稿與影片截圖（有 `reference.json` 時用它的整理結果），把 S1、S2 對應到與會者姓名。
 3. 校正字詞，產出 `transcript.corrected.md` 與 `meeting-minutes.md`。
 4. 列出建議加進[對照表](/features/accuracy#固定錯誤對照表)的項目，請你確認後才寫入。
@@ -36,7 +36,7 @@ Claude 會依序：
 |---|---|
 | 與會人數 | 說話者分離更準（見[講者人數](/features/diarization)） |
 | 與會者姓名與角色 | Claude 比較能把 S1、S2 對應到正確的人 |
-| 會議性質（「技術會議」「中英夾雜」「課程」） | Claude 會決定要不要用 Breeze、選哪一種[內容類型](/features/content-types) |
+| 會議性質（「技術會議」「中英夾雜」「有人講台語」「課程」） | Claude 會決定要不要用 Breeze-ASR-25 或台語用的 Breeze-ASR-26（會先提醒你台語會翻成華語文字、要人工核對）、選哪一種[內容類型](/features/content-types) |
 | 會出現的專有名詞 | 辨識與校正都會更準 |
 
 ## 常用說法

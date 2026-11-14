@@ -50,7 +50,7 @@ MMH="$HOME/Library/Application Support/meeting-minutes-pro"
 | `--no-diarize` | 不做說話者分離 |
 | `--diarize-engine auto\|sherpa\|pyannote` | 這次的說話者分離引擎（`pyannote` 要先裝 GPU 版） |
 | `--cluster-threshold X` | 分群門檻，數值越大判斷出的人數越少（只影響 CPU） |
-| `--whisper turbo\|breeze\|large-v3` | 辨識模型（breeze 要安裝時選裝；large-v3 要先下載） |
+| `--whisper turbo\|breeze\|breeze26\|large-v3` | 辨識模型（breeze 要安裝時選裝；breeze26 是台語用的 Breeze-ASR-26，2.5 起，選裝或用 `setup_backend.py --breeze26-only` 加裝；large-v3 要先下載） |
 | `--hotwords "a, b"` | 這次的專有名詞 |
 | `--language zh\|en\|auto` | 語言，預設 zh（中英夾雜也用 zh） |
 | `--no-keyframes`、`--scene X` | 影片不截圖；畫面變化門檻（越小截越多） |
@@ -140,6 +140,7 @@ install.cmd -Target CLI -Backend openvino:CPU   # 跳過偵測，直接指定（
 install.cmd -Target Both -Whisper large-v3      # 改用較準確但較慢的模型
 install.cmd -Target Both -KeepAll               # 保留所有後端的模型與套件
 install.cmd -Target Both -Breeze                # 安裝 Breeze-ASR-25，不詢問（-NoBreeze 則不安裝）
+install.cmd -Target Both -Breeze26              # 2.5：安裝台語用的 Breeze-ASR-26，不詢問（-NoBreeze26 則不裝；不會移除已裝的）
 install.cmd -Target Both -Correct               # 開啟自動校正，不詢問（-NoCorrect 則關閉）
 install.cmd -Target Both -Correct -CorrectProvider openai              # 指定供應商（auto / claude / openai）
 install.cmd -Target Both -Correct -CorrectModel sonnet                 # 指定模型
@@ -155,6 +156,7 @@ macOS：
 ./install.sh --target both                      # 不顯示選單，直接安裝（cli / app / both）
 ./install.sh --target cli --backend mlx:gpu     # 跳過偵測，直接指定（另有 ct2:cpu）
 ./install.sh --target both --breeze             # 安裝 Breeze-ASR-25（--no-breeze 則不安裝）
+# 2.5：macOS 不提供 Breeze-ASR-26（--breeze26 只印說明、略過）
 ./install.sh --target both --correct --correct-provider openai --correct-model gpt-6.1-sol
 ./install.sh --uninstall
 ```

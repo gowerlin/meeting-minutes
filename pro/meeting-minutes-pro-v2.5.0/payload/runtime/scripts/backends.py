@@ -3,13 +3,16 @@
 - openvino : OpenVINO GenAI WhisperPipeline，device = NPU / GPU（Intel）/ CPU（任何 x86-64）
 - ct2      : faster-whisper（CTranslate2），device = cuda（NVIDIA）或 cpu（macOS），compute_type 依硬體
 - mlx      : mlx-whisper，device = gpu（Apple Silicon，Metal）
+
+〔2.5.0〕create() 的 vad_filter：沒給（None）時依 common.asr_vad_filter(model, backend)（有說話者分離的預設；目前只有 breeze26 的 ct2 開）；
+transcribe.py 略過說話者分離時明確傳 False（規格 2.5.0 §6）。
 """
 import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import whisper_dir, whisper_ready  # noqa: E402
+from common import asr_vad_filter, model_supported, whisper_dir, whisper_ready  # noqa: E402
 
 
 def _add_nvidia_dll_dirs():
@@ -56,7 +59,7 @@ class CT2Backend:
     name = "ct2"
 
     def __init__(self, model: str, device: str, language: str | None, hotwords: str | None,
-                 compute_type: str = "default"):
+                 compute_type: str = "default", vad_filter: bool = False):
         _add_nvidia_dll_dirs()
         from faster_whisper import WhisperModel
         self.device = device
@@ -64,7 +67,7 @@ class CT2Backend:
         threads = 0 if dev == "cuda" else max(1, min(8, os.cpu_count() or 4))
         self.model = WhisperModel(str(whisper_dir("ct2", model)), device=dev, device_index=int(idx or 0),
                                   compute_type=compute_type, cpu_threads=threads)
-        self.kw = {"language": language, "beam_size": 5, "vad_filter": False,
+        self.kw = {"language": language, "beam_size": 5, "vad_filter": bool(vad_filter),   # 〔2.5.0〕預設照舊 False
                    "condition_on_previous_text": False, "without_timestamps": True}
         if hotwords:
             self.kw["hotwords"] = hotwords
@@ -97,13 +100,18 @@ class MLXBackend:
 
 
 def create(backend: str, model: str, device: str, language: str | None = "zh",
-           hotwords: str | None = None, compute_type: str = "default"):
+           hotwords: str | None = None, compute_type: str = "default", vad_filter: bool | None = None):
     if not whisper_ready(backend, model):
+        if model == "breeze26":                          # 〔2.5.0〕選用模型：說明怎麼加裝或不提供
+            if not model_supported(backend, model):
+                raise FileNotFoundError(f"本版不提供 {backend} 後端的 Breeze-ASR-26")
+            raise FileNotFoundError(f"沒有安裝 Breeze-ASR-26（{backend}）；加裝：setup_backend.py --breeze26-only")
         raise FileNotFoundError(f"缺少 {backend} 的 Whisper 模型（{model}），請重新執行 install.cmd")
     if backend == "openvino":
         return OpenVINOBackend(model, device, language, hotwords)
     if backend == "ct2":
-        return CT2Backend(model, device, language, hotwords, compute_type)
+        vad = asr_vad_filter(model, backend) if vad_filter is None else bool(vad_filter)
+        return CT2Backend(model, device, language, hotwords, compute_type, vad)
     if backend == "mlx":
         return MLXBackend(model, device, language, hotwords)
     raise ValueError(f"未知的 backend：{backend}")
