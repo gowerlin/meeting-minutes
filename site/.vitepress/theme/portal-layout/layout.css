@@ -6,8 +6,11 @@
  *   - ≥ 1440：版面上限改成整個視窗（側欄貼齊左緣、本頁目錄貼齊右緣），多出的寬度給主內容
  *   - ≥ 960：拿掉 688px 上限；純文字（段落、清單、引言、提示框、details）保留行長上限 --pl-doc-text-max，
  *     表格、程式碼、圖（figure、Mermaid、寬 SVG）用滿主內容寬度
+ *   - 沒有側欄的文件頁（sidebar: false）：≥ 1440 拿掉預設主題的 1104／784px 上限（960～1439 是 992／752px，維持原樣），
+ *     有沒有本頁目錄都一樣；行長與表格規則和有側欄的頁面相同
+ *   - 首頁（layout: home）：≥ 1440 的導覽列與頁尾維持預設主題的寬度（--pl-home-layout-max-width，預設 1440px）
  *   - 收合：<html> 的 pl-sidebar-collapsed／pl-aside-collapsed（layout-state.ts、components/LayoutToggles.vue）
- *   - 960 以下不動（側欄是抽屜）；首頁（layout: home）有自己的 1152px 版面，不受影響
+ *   - 960 以下不動（側欄是抽屜）；首頁（layout: home）的內容有自己的 1152px 版面，不受影響
  *   - 顏色只用 VitePress 主題變數（--vp-c-*），站點自帶品牌色
  *
  * 權重：預設主題的元件樣式是 scoped（多一個屬性選擇器），這裡的覆寫以 html:root 或 html.<狀態 class> 開頭，
@@ -16,6 +19,8 @@
 :root {
   /* 純文字的行長上限：約 80 個全形字。站點可在自己的 CSS 覆寫 */
   --pl-doc-text-max: 80em;
+  /* 首頁（layout: home）在 ≥ 1440 時的版面上限（導覽列、頁尾）：預設主題原本的值。站點改過 --vp-layout-max-width 時跟著改 */
+  --pl-home-layout-max-width: 1440px;
   /* 收合鈕的陰影；站點可覆寫 */
   --pl-shadow: var(--vp-shadow-2);
 }
@@ -61,6 +66,15 @@
 @media (min-width: 1440px) {
   html:root {
     --vp-layout-max-width: 100vw;
+  }
+  /* 首頁不加寬：導覽列與頁尾維持原本的寬度，不貼到視窗兩邊（不支援 :has() 的瀏覽器維持 v1.0.0 的樣子：撐滿） */
+  html:root:has(.VPContent.is-home) {
+    --vp-layout-max-width: var(--pl-home-layout-max-width);
+  }
+  /* 沒有側欄的文件頁：拿掉外框 1104px 與內容 784px 的上限，和有側欄的頁面一樣用滿寬度 */
+  html:root .VPDoc:not(.has-sidebar) .container,
+  html:root .VPDoc:not(.has-sidebar) .content {
+    max-width: none;
   }
   /* 側欄與網站名稱那一格固定是 --vp-sidebar-width（預設主題在這裡用 100% 與 100vw 混算，會差半個捲軸寬） */
   html:root .VPSidebar,
@@ -113,6 +127,13 @@
   }
   html.pl-aside-collapsed .pl-layout-toggle.is-aside {
     right: 4px;
+  }
+}
+@media (min-width: 1280px) and (max-width: 1439.98px) {
+  /* 沒有側欄的文件頁：預設主題把外框限制在 992px 置中，本頁目錄不在視窗右緣；收合鈕放在內容與本頁目錄的交界
+     （外框右緣距視窗右緣 (100% − 992px) ÷ 2，再加目錄欄 256px）。≥ 1440 外框不再限制，回到上面的位置 */
+  .VPDoc:not(.has-sidebar) .pl-layout-toggle.is-aside {
+    right: calc((100% - 992px) / 2 + 256px - 14px);
   }
 }
 @media print {

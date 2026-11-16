@@ -4,7 +4,7 @@ defineProps<{ steps: { title: string; text?: string }[] }>()
 </script>
 
 <template>
-  <ol class="mm-steps">
+  <ol class="mm-steps" data-pl-zoom>
     <li v-for="(s, i) in steps" :key="i">
       <span class="mm-step-no" aria-hidden="true">{{ i + 1 }}</span>
       <span class="mm-step-title">{{ s.title }}</span>

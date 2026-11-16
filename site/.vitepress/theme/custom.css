@@ -84,6 +84,11 @@
   padding: 0 !important;
   margin: 20px 0 !important;
 }
+/* 放大檢視（data-pl-zoom）的按鈕空間：上面的 padding: 0 !important 會蓋掉 portal-layout 保留的空間，
+   按鈕就壓在最後一張卡片右上角；這裡把保留空間加回來 */
+.mm-steps.pl-zoom-host.pl-zoom-html {
+  padding-top: var(--pl-zoom-reserve, 44px) !important;
+}
 .mm-steps li {
   display: flex;
   flex-direction: column;

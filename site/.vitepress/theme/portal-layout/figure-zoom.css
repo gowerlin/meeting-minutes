@@ -2,8 +2,11 @@
  * 按鈕：圖的右上角；平常半透明，滑鼠移上去或聚焦時明顯，觸控裝置（沒有 hover）常駐。列印不印出。
  * 檢視層：原生 <dialog>，佔滿視窗；背景跟著深淺色主題。顏色只用 VitePress 主題變數。 */
 .pl-zoom-host { position: relative; }
-/* SVG 宿主（Mermaid、流程圖）：上方留 44px 放按鈕，按鈕不壓在撐滿寬度的圖上；圖片照常把按鈕疊在右上角 */
-.pl-zoom-host.pl-zoom-svg { padding-top: var(--pl-zoom-reserve, 44px); }
+/* SVG 宿主（Mermaid、流程圖）與 HTML 圖：上方留 44px 放按鈕，按鈕不壓在撐滿寬度的圖上；
+   圖片照常把按鈕疊在右上角，加 data-pl-zoom-reserve（或 reserveImages）時也保留（pl-zoom-reserve） */
+.pl-zoom-host.pl-zoom-svg,
+.pl-zoom-host.pl-zoom-html,
+.pl-zoom-host.pl-zoom-reserve { padding-top: var(--pl-zoom-reserve, 44px); }
 .pl-zoom-inline {
   display: inline-block;
   position: relative;
@@ -157,6 +160,8 @@ html.pl-zoom-open { overflow: hidden; }
 }
 .pl-zoom-canvas > svg.pl-zoom-content { user-select: text; }
 .pl-zoom-canvas > img.pl-zoom-content { user-select: none; }
+/* HTML 圖：寬度固定在頁面上的寬度，transform: scale() 由左上角縮放（figure-zoom.ts） */
+.pl-zoom-canvas > .pl-zoom-html { transform-origin: 0 0; }
 /* Mermaid 的 HTML 標籤（foreignObject 裡的 <p>）：檢視層不在 .vp-doc 裡，不要套到頁面段落的間距與行高 */
 .pl-zoom-canvas foreignObject p {
   margin: 0;
