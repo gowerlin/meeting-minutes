@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { defineConfigWithTheme, type DefaultTheme, type HeadConfig } from 'vitepress'
+import { layoutHeadScript } from './theme/portal-layout/layout-state'
 
 // meeting-minutes Portal 的 VitePress 設定。
 // 公開網址（repo、Releases）只寫在這個檔的常數裡；頁面一律透過元件（ReleaseDownload、RepoLink…）讀 themeConfig，
@@ -194,7 +195,9 @@ export default () => {
     ['meta', { name: 'theme-color', content: '#0f3d3e' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: SITE_TITLE }],
-    ['meta', { property: 'og:locale', content: 'zh_TW' }]
+    ['meta', { property: 'og:locale', content: 'zh_TW' }],
+    // vitepress-portal-layout：首屏繪製前依 localStorage 套用左右功能表的收合狀態（GitHub Pages 沒有 CSP，不必算雜湊）
+    ['script', {}, layoutHeadScript]
   ]
 
   return defineConfigWithTheme<ThemeConfig>({

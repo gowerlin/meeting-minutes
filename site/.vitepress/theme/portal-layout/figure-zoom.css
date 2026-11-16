@@ -1,0 +1,184 @@
+/* vitepress-portal-layout：圖的放大檢視（figure-zoom.ts）
+ * 按鈕：圖的右上角；平常半透明，滑鼠移上去或聚焦時明顯，觸控裝置（沒有 hover）常駐。列印不印出。
+ * 檢視層：原生 <dialog>，佔滿視窗；背景跟著深淺色主題。顏色只用 VitePress 主題變數。 */
+.pl-zoom-host { position: relative; }
+/* SVG 宿主（Mermaid、流程圖）：上方留 44px 放按鈕，按鈕不壓在撐滿寬度的圖上；圖片照常把按鈕疊在右上角 */
+.pl-zoom-host.pl-zoom-svg { padding-top: var(--pl-zoom-reserve, 44px); }
+.pl-zoom-inline {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  vertical-align: top;
+}
+.pl-zoom-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background-color: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  box-shadow: var(--pl-shadow, var(--vp-shadow-2));
+  cursor: zoom-in;
+  opacity: 0.45;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.pl-zoom-host:hover > .pl-zoom-btn,
+.pl-zoom-btn:hover,
+.pl-zoom-btn:focus-visible {
+  opacity: 1;
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+.pl-zoom-btn:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+@media (hover: none) {
+  .pl-zoom-btn { opacity: 0.9; }
+}
+/* 按鈕與工具列的圖示固定 18px：站點常有「figure svg { width: 100% }」之類的規則，會連圖示一起撐大。
+   選擇器權重 (0,2,1)，高過 .vp-doc figure svg、.my-figure svg 這類寫法 */
+.pl-zoom-host > .pl-zoom-btn > svg,
+.pl-zoom-tools > .pl-zoom-tool > svg {
+  display: block;
+  flex: none;
+  width: 18px;
+  min-width: 0;
+  max-width: none;
+  height: 18px;
+  margin: 0;
+}
+
+html.pl-zoom-open { overflow: hidden; }
+.pl-zoom-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  overscroll-behavior: contain;
+}
+.pl-zoom-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.pl-zoom-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+}
+.pl-zoom-title {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pl-zoom-level {
+  min-width: 3.5em;
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pl-zoom-tools {
+  display: flex;
+  gap: 0.35rem;
+}
+.pl-zoom-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.4rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  cursor: pointer;
+}
+.pl-zoom-tool[hidden] { display: none; }
+.pl-zoom-tool:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+.pl-zoom-tool:focus-visible,
+.pl-zoom-stage:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: -2px;
+}
+.pl-zoom-tool-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pl-zoom-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background: var(--vp-c-bg);
+}
+.pl-zoom-stage.is-dragging { cursor: grabbing; }
+.pl-zoom-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.pl-zoom-canvas > .pl-zoom-content {
+  display: block;
+  max-width: none !important;
+  max-height: none !important;
+}
+.pl-zoom-canvas > svg.pl-zoom-content { user-select: text; }
+.pl-zoom-canvas > img.pl-zoom-content { user-select: none; }
+/* Mermaid 的 HTML 標籤（foreignObject 裡的 <p>）：檢視層不在 .vp-doc 裡，不要套到頁面段落的間距與行高 */
+.pl-zoom-canvas foreignObject p {
+  margin: 0;
+  line-height: inherit;
+  overflow-wrap: normal;
+}
+.pl-zoom-help {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-top: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+@media (max-width: 640px) {
+  .pl-zoom-title { flex-basis: 100%; }
+  .pl-zoom-level { text-align: left; }
+  .pl-zoom-tools { margin-left: auto; }
+  .pl-zoom-help { display: none; }
+}
+@media print {
+  .pl-zoom-btn,
+  .pl-zoom-dialog { display: none !important; }
+}

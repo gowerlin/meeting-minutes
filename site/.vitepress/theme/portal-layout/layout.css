@@ -1,0 +1,122 @@
+/* vitepress-portal-layout：版面（寬螢幕加寬主內容、左右可收合）
+ *
+ * 以 VitePress 1.6.4 預設主題驗證。預設主題把整個版面限制在 --vp-layout-max-width（1440px）置中，
+ * 寬螢幕時側欄左邊、本頁目錄右邊各一整塊留白；有本頁目錄的頁面，內容另外限制在 688px
+ * （.VPDoc.has-aside .content-container）。這裡：
+ *   - ≥ 1440：版面上限改成整個視窗（側欄貼齊左緣、本頁目錄貼齊右緣），多出的寬度給主內容
+ *   - ≥ 960：拿掉 688px 上限；純文字（段落、清單、引言、提示框、details）保留行長上限 --pl-doc-text-max，
+ *     表格、程式碼、圖（figure、Mermaid、寬 SVG）用滿主內容寬度
+ *   - 收合：<html> 的 pl-sidebar-collapsed／pl-aside-collapsed（layout-state.ts、components/LayoutToggles.vue）
+ *   - 960 以下不動（側欄是抽屜）；首頁（layout: home）有自己的 1152px 版面，不受影響
+ *   - 顏色只用 VitePress 主題變數（--vp-c-*），站點自帶品牌色
+ *
+ * 權重：預設主題的元件樣式是 scoped（多一個屬性選擇器），這裡的覆寫以 html:root 或 html.<狀態 class> 開頭，
+ * 權重一定比較高，不靠載入順序。升級 VitePress 時要重看的選擇器列在 references/selectors.md。 */
+
+:root {
+  /* 純文字的行長上限：約 80 個全形字。站點可在自己的 CSS 覆寫 */
+  --pl-doc-text-max: 80em;
+  /* 收合鈕的陰影；站點可覆寫 */
+  --pl-shadow: var(--vp-shadow-2);
+}
+
+@media (min-width: 960px) {
+  html:root .VPDoc.has-aside .content-container {
+    max-width: none;
+  }
+  /* 頁面的 Markdown 包在 .vp-doc 底下的一層 div 裡；要限制行長的自訂區塊加 class pl-text-width */
+  .vp-doc > div > :is(p, ul, ol, dl, blockquote, details, .custom-block),
+  .vp-doc .pl-text-width {
+    max-width: var(--pl-doc-text-max);
+  }
+
+  /* 左側選單收合：側欄移出畫面，內容、本頁目錄下拉（960～1280）往左補滿 */
+  html.pl-sidebar-collapsed .VPSidebar {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateX(-100%);
+    transition: none;
+  }
+  html.pl-sidebar-collapsed .VPContent.has-sidebar,
+  html.pl-sidebar-collapsed .VPLocalNav.has-sidebar,
+  html.pl-sidebar-collapsed .VPNavBar.has-sidebar .divider {
+    padding-left: 0;
+  }
+  html.pl-sidebar-collapsed .VPLocalNavOutlineDropdown .items {
+    left: 32px;
+  }
+  /* 側欄原本墊在網站名稱底下；收合後名稱那一格自己補底色，捲動的內容不會透出來 */
+  html.pl-sidebar-collapsed .VPNavBar.has-sidebar .title {
+    background-color: var(--vp-nav-bg-color);
+  }
+}
+
+@media (min-width: 1280px) {
+  /* 右側本頁目錄收合 */
+  html.pl-aside-collapsed .VPDoc .aside {
+    display: none;
+  }
+}
+
+@media (min-width: 1440px) {
+  html:root {
+    --vp-layout-max-width: 100vw;
+  }
+  /* 側欄與網站名稱那一格固定是 --vp-sidebar-width（預設主題在這裡用 100% 與 100vw 混算，會差半個捲軸寬） */
+  html:root .VPSidebar,
+  html:root .VPNavBar.has-sidebar .title {
+    padding-left: 32px;
+    width: var(--vp-sidebar-width);
+  }
+}
+
+/* ── 收合鈕：固定在側欄與內容的交界，收合後移到視窗邊緣 ─────────────── */
+.pl-layout-toggle {
+  display: none;
+  position: fixed;
+  top: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 12px);
+  z-index: calc(var(--vp-z-index-nav) - 1);
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  background-color: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  box-shadow: var(--pl-shadow);
+  cursor: pointer;
+}
+.pl-layout-toggle:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+.pl-layout-toggle:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+@media (min-width: 960px) {
+  .pl-layout-toggle.is-sidebar {
+    display: flex;
+    left: calc(var(--vp-sidebar-width) - 14px);
+  }
+  html.pl-sidebar-collapsed .pl-layout-toggle.is-sidebar {
+    left: 4px;
+  }
+}
+@media (min-width: 1280px) {
+  /* 本頁目錄：VPDoc 右側 padding 32px＋目錄欄 256px（含左 padding 32px） */
+  .pl-layout-toggle.is-aside {
+    display: flex;
+    right: calc(32px + 256px - 14px);
+  }
+  html.pl-aside-collapsed .pl-layout-toggle.is-aside {
+    right: 4px;
+  }
+}
+@media print {
+  .pl-layout-toggle {
+    display: none !important;
+  }
+}

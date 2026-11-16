@@ -1,17 +1,30 @@
 // 預設主題加上幾個讀 themeConfig 的元件（版號、下載連結、repo 連結、步驟條、會議記錄校稿介紹、開發方式連結）。
 // 頁面要用版號或網址時一律用元件；.md 裡不要用 $theme（建置時錯誤會被吞掉），元件內用 useData()。
+// 版型（主內容加寬、左右功能表收合、圖的放大檢視）來自 vitepress-portal-layout v1.0.0，檔案在 portal-layout/，不要改內容。
+import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
 import type { Theme } from 'vitepress'
+import LayoutToggles from './portal-layout/components/LayoutToggles.vue'
+import FigureZoom from './portal-layout/components/FigureZoom.vue'
 import MmVersion from './components/MmVersion.vue'
 import ReleaseDownload from './components/ReleaseDownload.vue'
 import RepoLink from './components/RepoLink.vue'
 import StepFlow from './components/StepFlow.vue'
 import ProofreadIntro from './components/ProofreadIntro.vue'
 import DevTools from './components/DevTools.vue'
+import './portal-layout/layout.css'
+import './portal-layout/figure-zoom.css'
+// 站點自己的樣式放在 portal-layout 之後
 import './custom.css'
 
 export default {
   extends: DefaultTheme,
+  Layout: () => h(DefaultTheme.Layout, null, {
+    // 寬螢幕的左側選單、右側本頁目錄收合鈕（只在文件頁）
+    'doc-top': () => h(LayoutToggles),
+    // 圖的放大檢視：替文中的截圖加「放大檢視」按鈕（本身不輸出內容）
+    'layout-bottom': () => h(FigureZoom)
+  }),
   enhanceApp({ app }) {
     app.component('MmVersion', MmVersion)
     app.component('ReleaseDownload', ReleaseDownload)
