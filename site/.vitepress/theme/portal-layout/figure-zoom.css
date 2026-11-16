@@ -3,10 +3,12 @@
  * 檢視層：原生 <dialog>，佔滿視窗；背景跟著深淺色主題。顏色只用 VitePress 主題變數。 */
 .pl-zoom-host { position: relative; }
 /* SVG 宿主（Mermaid、流程圖）與 HTML 圖：上方留 44px 放按鈕，按鈕不壓在撐滿寬度的圖上；
-   圖片照常把按鈕疊在右上角，加 data-pl-zoom-reserve（或 reserveImages）時也保留（pl-zoom-reserve） */
-.pl-zoom-host.pl-zoom-svg,
-.pl-zoom-host.pl-zoom-html,
-.pl-zoom-host.pl-zoom-reserve { padding-top: var(--pl-zoom-reserve, 44px); }
+   圖片照常把按鈕疊在右上角，加 data-pl-zoom-reserve（或 reserveImages）時也保留（pl-zoom-reserve）。
+   v1.1.1：html:root 前綴＋!important。站點對宿主寫的 padding: 0（同權重較晚載入，或 !important）都蓋不掉保留空間；
+   只有 padding-top 這一邊，站點自己的左右下 padding 照舊。不要保留空間時在宿主加 data-pl-zoom-reserve="off" */
+html:root .pl-zoom-host.pl-zoom-svg,
+html:root .pl-zoom-host.pl-zoom-html,
+html:root .pl-zoom-host.pl-zoom-reserve { padding-top: var(--pl-zoom-reserve, 44px) !important; }
 .pl-zoom-inline {
   display: inline-block;
   position: relative;
@@ -34,6 +36,7 @@
   transition: opacity 0.15s, color 0.15s, border-color 0.15s;
 }
 .pl-zoom-host:hover > .pl-zoom-btn,
+.pl-zoom-btn.is-host-hover,
 .pl-zoom-btn:hover,
 .pl-zoom-btn:focus-visible {
   opacity: 1;
@@ -47,9 +50,17 @@
 @media (hover: none) {
   .pl-zoom-btn { opacity: 0.9; }
 }
-/* 按鈕與工具列的圖示固定 18px：站點常有「figure svg { width: 100% }」之類的規則，會連圖示一起撐大。
-   選擇器權重 (0,2,1)，高過 .vp-doc figure svg、.my-figure svg 這類寫法 */
-.pl-zoom-host > .pl-zoom-btn > svg,
+/* v1.1.1：圖片以外的宿主，按鈕不放進宿主，插在宿主後面（figure-zoom.ts 的 attach）。留在靜態位置（top／left 都是 auto），
+   figure-zoom.ts 量好位置後用行內 transform 移到宿主右上角；站點對 button 寫的 position、外距、浮動都不適用 */
+html:root .pl-zoom-btn.is-placed {
+  position: absolute !important;
+  inset: auto !important;
+  float: none !important;
+  margin: 0 !important;
+}
+/* 按鈕與工具列的圖示固定 18px：站點常有「figure svg { width: 100% }」「.vp-doc svg { … }」之類的規則，會連圖示一起撐大。
+   選擇器權重 (0,2,2)，高過 .vp-doc figure svg、.my-figure svg 這類寫法 */
+html:root .pl-zoom-btn > svg,
 .pl-zoom-tools > .pl-zoom-tool > svg {
   display: block;
   flex: none;
