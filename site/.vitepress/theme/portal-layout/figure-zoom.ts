@@ -34,7 +34,9 @@
 //   元素時再往外一層），絕對定位、留在原本的靜態位置，再用 transform 移到宿主的右上角。宿主的子元素完全不變：站點的
 //   :first-child／:last-child／:nth-child 規則照舊，<ol>／<ul>／<table> 也不會多一個不合法的 <button> 子元素。
 //   位置在宿主或其父元素大小改變（ResizeObserver）、視窗大小改變、捲動容器捲動、字型載入、頁面內容改變時重新量。
-//   圖片照舊包一層 span（skill 自己的元素）、按鈕放在 span 裡
+//   圖片照舊包一層 span（skill 自己的元素）、按鈕放在 span 裡。
+//   宿主放大的是圖片時（v1.1.5；例：<figure> 包一張比它窄的 <img>），按鈕移到**圖片**的右上角（有保留空間時 y 照舊在保留空間裡），
+//   不再落在宿主右側的空白處；只改位置，DOM、class、保留空間不變。SVG、Mermaid、HTML 圖照舊對齊宿主
 // - data-* 屬性（data-kind、data-scale、data-tx、data-ty、data-nw、data-nh、data-page-scale、data-page-w）給
 //   scripts/layout-check.mjs 的 --figure-test 用；
 //   宿主的 data-pl-zoom-key 與按鈕的 data-pl-zoom-for 互相對應（layout-check.mjs 用來找按鈕的宿主）
@@ -757,8 +759,11 @@ export function zoomButton(label: string): HTMLButtonElement {
 // ── 放在宿主外的按鈕：位置（v1.1.1） ─────────────────────────────────
 // 按鈕插在宿主（或不允許 <button> 子元素的祖先）後面，絕對定位、top／left 都是 auto，所以留在原本的靜態位置；
 // 量宿主與按鈕的矩形，用 transform 把按鈕移到宿主右上角（距 padding box 上緣、右緣各 INSET）。
-// 靜態位置跟著頁面一起移動（上方內容變高時兩者一起往下），只有寬度、高度、捲動改變時要重新量
-interface Placed { btn: HTMLButtonElement; host: HTMLElement; anchor: Element; dx: number; dy: number; hidden: boolean }
+// 靜態位置跟著頁面一起移動（上方內容變高時兩者一起往下），只有寬度、高度、捲動改變時要重新量。
+// 宿主放大的是圖片（v1.1.5，img: true；例：<figure> 包一張窄 <img>）：按鈕對齊**圖片**的右上角，不是宿主的——
+// x = min(宿主內緣右, 圖右) − INSET − 按鈕寬（不小於宿主內緣左 + INSET）；y = 有保留空間時照舊在宿主上緣（保留空間裡），
+// 沒有時 = max(宿主上緣, 圖上緣) + INSET。圖說在上面、圖置中或靠左而比宿主窄時，按鈕都貼著圖。SVG、Mermaid、HTML 圖照舊對齊宿主
+interface Placed { btn: HTMLButtonElement; host: HTMLElement; anchor: Element; dx: number; dy: number; hidden: boolean; img: boolean }
 const placed = new Set<Placed>()
 let keySeq = 0
 let resizeWatch: ResizeObserver | null = null
@@ -800,8 +805,21 @@ function placeAll() {
     // 靜態位置 = 目前位置扣掉目前的位移（只有 translate）
     const sx = br.left - p.dx
     const sy = br.top - p.dy
-    const left = snap(hr.right - parseFloat(cs.borderRightWidth) - INSET - br.width)
-    const top = snap(hr.top + parseFloat(cs.borderTopWidth) + INSET)
+    const right = hr.right - parseFloat(cs.borderRightWidth)
+    const topEdge = hr.top + parseFloat(cs.borderTopWidth)
+    let left = right - INSET - br.width
+    let top = topEdge + INSET
+    if (p.img) {
+      // 圖片宿主（v1.1.5）：以圖片的矩形定位；圖還沒有方塊（載入前沒有寬高）時照舊對齊宿主
+      const src = sourceOf(p.host)
+      const ir = src?.kind === 'img' && src.el.getClientRects().length ? src.el.getBoundingClientRect() : null
+      if (ir && ir.width > 0) {
+        left = Math.max(hr.left + parseFloat(cs.borderLeftWidth) + INSET, Math.min(right, ir.right) - INSET - br.width)
+        if (!RESERVE_CLASSES.some((c) => p.host.classList.contains(c))) top = Math.max(topEdge, ir.top) + INSET
+      }
+    }
+    left = snap(left)
+    top = snap(top)
     return { dx: left - sx, dy: top - sy }
   })
   list.forEach((p, i) => {
@@ -847,9 +865,11 @@ function attach(host: HTMLElement, target: Element = host) {
   }
   // 其他宿主：按鈕放在宿主外（宿主的子元素不變），定位到宿主右上角
   b.classList.add('is-placed')
-  const p: Placed = { btn: b, host, anchor: anchorOf(host), dx: 0, dy: 0, hidden: false }
+  const p: Placed = { btn: b, host, anchor: anchorOf(host), dx: 0, dy: 0, hidden: false, img: kind === 'img' }
   p.anchor.after(b)
   placed.add(p)
+  // 圖片宿主（v1.1.5）：圖載入後大小可能改變而宿主不變（例：只設了高度），載入完成時重新定位
+  if (p.img) host.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', schedulePlace, { once: true }) })
   // 滑鼠在宿主上時按鈕明顯（按鈕不是宿主的子元素，CSS 的 :hover > 選不到）
   host.addEventListener('pointerenter', () => b.classList.add('is-host-hover'))
   host.addEventListener('pointerleave', () => b.classList.remove('is-host-hover'))

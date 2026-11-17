@@ -10,6 +10,7 @@
  *     有沒有本頁目錄都一樣；行長與表格規則和有側欄的頁面相同
  *   - 首頁（layout: home）：≥ 1440 的導覽列與頁尾維持預設主題的寬度（--pl-home-layout-max-width，預設 1440px）
  *   - 收合：<html> 的 pl-sidebar-collapsed／pl-aside-collapsed（layout-state.ts、components/LayoutToggles.vue）
+ *   - 網站名稱（v1.1.5）：有側欄的頁、≥ 960 時，側欄上方那一格裡的 logo 與名稱水平置中（收合時也是）；放不下時靠左、省略號截斷
  *   - 960 以下不動（側欄是抽屜）；首頁（layout: home）的內容有自己的 1152px 版面，不受影響
  *   - 顏色只用 VitePress 主題變數（--vp-c-*），站點自帶品牌色
  *
@@ -54,6 +55,31 @@
   html.pl-sidebar-collapsed .VPNavBar.has-sidebar .title {
     background-color: var(--vp-nav-bg-color);
   }
+
+  /* 網站名稱置中（v1.1.5）：有側欄的頁，側欄上方那一格（.container > .title，寬 --vp-sidebar-width）裡的 logo 與名稱水平置中，
+     側欄收合時也一樣。格本身（寬、左右 padding 32px、高）與名稱連結 a.title 的方塊（底線的範圍）都不變：
+     a.title 左右各放一個伸縮的空白（::before／::after），兩個空白各往外延伸 16px（負 margin），
+     所以名稱以整格的中心置中，最寬可用「格寬 − 32px」（距格的左右緣至少 16px），比 a.title 寬時左右對稱地超出它。
+     放不下時兩個空白縮成 0、名稱文字以省略號截斷，從距格左緣 16px 開始（不溢出格外）。
+     首頁、沒有側欄的頁、960 以下（側欄是抽屜）不套用 */
+  html:root .VPNavBar.has-sidebar .VPNavBarTitle > .title::before,
+  html:root .VPNavBar.has-sidebar .VPNavBarTitle > .title::after {
+    content: '';
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  html:root .VPNavBar.has-sidebar .VPNavBarTitle > .title::before {
+    margin-left: -16px;
+  }
+  html:root .VPNavBar.has-sidebar .VPNavBarTitle > .title::after {
+    margin-right: -16px;
+  }
+  /* 預設主題放名稱的 span（沒有 class；logo 是 img.logo）：可以縮小，放不下時以省略號截斷 */
+  html:root .VPNavBar.has-sidebar .VPNavBarTitle > .title > span:not([class]) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 @media (min-width: 1280px) {
@@ -76,9 +102,11 @@
   html:root .VPDoc:not(.has-sidebar) .content {
     max-width: none;
   }
-  /* 側欄與網站名稱那一格固定是 --vp-sidebar-width（預設主題在這裡用 100% 與 100vw 混算，會差半個捲軸寬） */
+  /* 側欄與網站名稱那一格固定是 --vp-sidebar-width（預設主題在這裡用 100% 與 100vw 混算，會差半個捲軸寬）。
+     v1.1.5：只選那一格（.container > .title）。v1.1.4 以前的 .VPNavBar.has-sidebar .title 也選到格裡的名稱連結 a.title
+     （同樣是 class title），a.title 變成 272px 寬、左 padding 32px，名稱離格左緣 64px、超出格右緣 32px */
   html:root .VPSidebar,
-  html:root .VPNavBar.has-sidebar .title {
+  html:root .VPNavBar.has-sidebar .container > .title {
     padding-left: 32px;
     width: var(--vp-sidebar-width);
   }
