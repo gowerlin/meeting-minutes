@@ -13,7 +13,9 @@
 //   複製品放在一串和原本祖先相同標籤與屬性的外殼裡（display: contents，不產生方塊），所以 .vp-doc、宿主 class 的後代選擇器、
 //   Vue scoped 樣式（data-v-* 屬性）都照樣套得到；複製品是 inert（不能聚焦、按不到、不觸發原元件的事件），id 照 SVG 的做法改寫
 // - 檢視層是原生 <dialog>（showModal：頁面其他部分不可操作、在最上層）；焦點鎖在檢視層內，關閉後回到原按鈕
-// - 開啟時的倍率（v1.1.1）：min(10, max(符合畫面, 頁面倍率))——一打開至少和頁面上一樣大，放得下就整張看得見。
+// - 開啟時的倍率（v1.1.1；v1.1.2 加小差距的規則）：頁面倍率 > 符合畫面 × 1.02 時取 min(10, 頁面倍率)，否則取符合畫面
+//   ——一打開至少和頁面上一樣大，放得下就整張看得見；頁面倍率只比符合畫面大不到 2% 時取符合畫面，整張看得見
+//   （不必為了最後幾 px 拖曳；圖只比頁面上小不到 2%）。
 //   頁面倍率 = 圖在頁面上的顯示寬度 ÷ 它在倍率 1 時的寬度（SVG、Mermaid：顯示寬 ÷ viewBox 寬；圖片：顯示寬 ÷ 原檔寬；
 //   HTML 圖以頁面寬度排版，頁面倍率 = 1）。四種內容同一條規則。圖比檢視區大時從左上開始，可拖曳、方向鍵平移看其餘部分；
 //   「符合畫面」（0）仍可縮到整張看得見
@@ -98,6 +100,12 @@ const MANUAL = '[data-pl-zoom-manual]'
 const LADDER = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8]
 const MIN_SCALE = 0.05
 const MAX_SCALE = 10
+// 開啟倍率的小差距門檻（v1.1.2）：頁面倍率超過符合畫面的這個倍數，才用頁面倍率開啟；否則用符合畫面（整張看得見）。
+// 理由：頁面上顯示得只比「檢視區放得下的大小」大一點點時（例：1920 寬的截圖 79.0% 對 78.5%、390 寬的 HTML 圖 100% 對 99.2%），
+// 用頁面倍率開啟只會讓最後幾 px 跑出檢視區、要拖曳才看得到；改用符合畫面時圖只比頁面上小不到 2%，看起來一樣大。
+// 2%：實際站點量到的這類差距都在 1% 以內，留一倍的餘裕；差距比這個大時仍照頁面倍率開啟（一打開不比頁面上小）。
+// 固定值，不開放設定
+const PAGE_OVER_FIT = 1.02
 const PAD = 16
 const KEEP_VISIBLE = 48
 const ZWSP = String.fromCharCode(0x200b)
@@ -291,7 +299,7 @@ interface View {
   scale: number
   tx: number
   ty: number
-  // initial：開啟時的檢視（max(符合畫面, 頁面倍率)）；fit：符合畫面；free：使用者縮放或平移過。
+  // initial：開啟時的檢視（initialView：頁面倍率 > 符合畫面 × 1.02 時頁面倍率，否則符合畫面）；fit：符合畫面；free：使用者縮放或平移過。
   // 前兩種在檢視區大小、HTML 圖高度改變時重新計算
   mode: 'initial' | 'fit' | 'free'
 }
@@ -475,14 +483,16 @@ function measurePage(v: View, el: Element): void {
   v.dialog.dataset.pageScale = v.pageScale.toFixed(4)
 }
 
-// 開啟時的檢視（v1.1.1）：倍率 min(10, max(符合畫面, 頁面倍率))——一打開至少和頁面上一樣大，放得下就整張看得見。
+// 開啟時的檢視（v1.1.1；v1.1.2 加小差距的規則）：頁面倍率 > 符合畫面 × PAGE_OVER_FIT 時倍率 min(10, 頁面倍率)
+// ——一打開至少和頁面上一樣大；否則符合畫面（整張看得見；頁面倍率只比它大不到 2% 時也是）。
 // 放得下的方向置中；放不下的方向從頭開始（左、上留 PAD），其餘部分拖曳、方向鍵平移
 function initialView() {
   const v = view
   if (!v?.content) return
   const W = v.stage.clientWidth
   const H = v.stage.clientHeight
-  v.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, fitScale(v), v.pageScale))
+  const fit = fitScale(v)
+  v.scale = v.pageScale > fit * PAGE_OVER_FIT ? Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.pageScale)) : fit
   const w = v.nw * v.scale
   const h = v.nh * v.scale
   v.tx = w <= W - PAD * 2 ? (W - w) / 2 : PAD

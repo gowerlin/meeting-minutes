@@ -1,6 +1,6 @@
 // 預設主題加上幾個讀 themeConfig 的元件（版號、下載連結、repo 連結、步驟條、會議記錄校稿介紹、開發方式連結）。
 // 頁面要用版號或網址時一律用元件；.md 裡不要用 $theme（建置時錯誤會被吞掉），元件內用 useData()。
-// 版型（主內容加寬、左右功能表收合、圖的放大檢視）來自 vitepress-portal-layout v1.1.1，檔案在 portal-layout/，不要改內容。
+// 版型（主內容加寬、左右功能表收合、圖的放大檢視）來自 vitepress-portal-layout v1.1.2，檔案在 portal-layout/，不要改內容。
 import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
 import type { Theme } from 'vitepress'
